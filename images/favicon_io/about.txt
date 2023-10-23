@@ -1,0 +1,15 @@
+This favicon was generated using the following font:
+
+- Font Title: Harmattan
+- Font Author: Copyright (c) 2007-2008, The C&MA Guinea Fulbe Team;
+
+Copyright renewed 2011-2012, George W. Nuss (http://www.fulbefouta.com),
+with the Reserved Font Name "Fouta".
+
+Copyright (c) 2004-2023, SIL International (http://www.sil.org),
+with Reserved Font Names 'Andika' and 'SIL'.
+
+Copyright (c) 2014-2023, SIL International (http://www.sil.org/).
+with Reserved Font Names "Harmattan" and "SIL".
+- Font Source: http://fonts.gstatic.com/s/harmattan/v19/gokpH6L2DkFvVvRp9Xpr92-HmNZEq6TTFw.ttf
+- Font License: SIL Open Font License, 1.1 (http://scripts.sil.org/OFL))

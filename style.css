@@ -1,0 +1,149 @@
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box ;
+}
+body{
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  font-size: 16px;
+  background: #242424;
+}
+
+/* ////////  LEFT AND RIGHT NAVBARS //////// */
+.left-navbar{
+  font-family: inter;
+  background: #373737;
+  color: #848383;
+  font-weight: bold;
+  height: 100vh;
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  grid-area: left-navbar;
+
+}
+.right-navbar{
+  font-family: inter;
+  background: #373737;
+  color: #848383;
+  font-weight: bold;
+  height: 100vh;
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  grid-area: right-navbar;
+}
+
+.left-navbar  img {
+  padding-top: 2em;
+  width: 60px;
+  cursor: pointer;
+  transition: all .1s;
+  &:hover{
+    scale: 1.1;
+  }
+  &:active{
+    scale: 0.95;
+    transition: .01;
+  }
+}
+/* ////////  MAIN CONTENT ///////// */
+
+main {
+  display: grid;
+  grid-template-areas:  "left-navbar html css  right-navbar"
+                        "left-navbar js iframe right-navbar"   ;
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  color: white;
+  background: rgb(187, 187, 187);
+  font-family: inter;
+  background: #1e1e1e;
+
+}
+
+/* ////////  EDITORS ///////// */
+#html-editor{
+  grid-area: html;
+}
+#js-editor{
+  grid-area: js;
+}
+
+#css-editor{
+  grid-area: css;
+}
+
+iframe{
+  grid-area: iframe;
+  background: rgb(238, 238, 238);
+  width: 44vw;
+  height: 50vh;
+
+}
+
+.icon-labels{
+  margin-top: 10px;
+}
+.containers,iframe{
+  border: 5px solid rgb(61, 61, 61);
+  width: 44vw;
+  height: 50vh;
+}
+
+.containers {
+  position: relative;
+
+}
+/* bg-images  */
+.icons {
+  width: 300px;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  filter: opacity(15%);
+  pointer-events: none;
+  z-index: 20;
+
+}
+
+/* //////// SELECT BOXES ///////// */
+select > option {
+  font-family: inter;
+  font-weight: bold;
+  padding: .2em;
+  padding-right: 20px;
+  background: #303030;
+  color: white;&:hover{
+    background: rgb(16, 78, 234);
+    cursor: pointer;
+  }
+}
+
+#theme-menu{
+  background: #303030;
+  height: 120px;
+  
+}
+
+#theme-menu option {
+
+background: #303030;
+&:hover{
+  background: rgb(16, 78, 234);
+}
+
+}
+select option:checked{
+  background: rgb(16, 78, 234);
+}
+#theme-menu option:checked{
+  background: rgb(16, 78, 234);
+}

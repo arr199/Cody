@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="apple-touch-icon" sizes="180x180" href="images/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon_io/favicon-16x16.png">
+    <link rel="manifest" href="images/favicon_io/site.webmanifest">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css">
+     
+    <title>CodyStudio</title>
+  </head>
+  <body>
+    <header>
+      <!--  LEFT BAR -->
+      <nav class="left-navbar">
+        <img id="font-size-icon" src="images/font.png" alt="">
+        <label class="icon-labels" for="font-size-icon">Font-size</label>
+        <select  id="font-size-menu" style="position: absolute; top: 90px;left: 50px;  z-index: -10;">
+          <option value="15">15 px</option>
+          <option value="16">16 px</option>  
+          <option value="17">17 px</option>
+          <option value="18">18 px</option>
+          <option value="19">19 px</option>  
+          <option value="20">20 px</option>
+          <option value="21">21 px</option>
+          <option value="22">22 px</option>
+          <option value="23">23 px</option>
+          <option value="24">24 px</option>
+          <option value="25">25 px</option>
+          <option value="26">26 px</option>
+          <option value="27">27 px</option>
+          <option value="28">28 px</option>
+        </select>
+        
+        <label for="color-palette"><img id="theme-icon" for="color" style=" position: relative; " src="images/palette.png" alt=""></img></label>
+        <label class="icon-labels" >Theme</label>
+        <select id="theme-menu" style="position: absolute; top: 210px;left: 50px;  z-index: -10;">
+          <option value="vs-dark">vs-dark</option>  
+          <option value="hc-black">hc-black</option>
+          <option value="hc-light">hc-light</option>
+        </select>
+        <img  id="copy-url" src="images/files.png" alt="">
+        <label class="icon-labels" for="copy-url">Copy url</label>
+      </nav>
+  </header>
+  
+  <main> <!--  EDITORS  -->
+    <div id="html-editor" class="containers">
+      <img class="icons" src="images/html (1).png">    
+    </div>
+   
+    <div id="css-editor" class="containers">
+      <img class="icons" src="images/css.png">
+    </div>
+   
+    <div id="js-editor" class="containers">
+      <img class="icons" src="images/js.png">
+    </div>
+   <!--  PREVIEW SCREEN -->
+    <iframe class="containers" id="page" srcdoc="" frameborder="2"></iframe>
+     <!--  RIGHT BAR -->
+    <nav class="right-navbar">
+    </nav>
+  </main> 
+    <script type="module" src="main.js">
+    </script>
+  </body>
+</html>
