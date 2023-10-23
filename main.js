@@ -121,8 +121,8 @@ fontSizeMenu.addEventListener('change', () => {
 
 themeMenu.addEventListener('change', () => {
   htmlEditor.updateOptions({ theme: themeMenu.value })
-  htmlEditor.updateOptions({ theme: themeMenu.value })
-  htmlEditor.updateOptions({ theme: themeMenu.value })
+  cssEditor.updateOptions({ theme: themeMenu.value })
+  jsEditor.updateOptions({ theme: themeMenu.value })
 })
 
 //  set the theme every time we change the select box //
