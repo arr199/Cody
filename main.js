@@ -86,7 +86,7 @@ jsEditor.onDidChangeModelContent(e => {
   clearTimeout(renderJs)
   renderJs = setTimeout(() => {
     page.setAttribute('srcdoc', createHtml())
-    // history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
+    history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
   }, 2000)
 })
 
@@ -95,7 +95,7 @@ cssEditor.onDidChangeModelContent(e => {
   clearTimeout(renderCss)
   renderCss = setTimeout(function () {
     page.setAttribute('srcdoc', createHtml())
-    // history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
+    history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
   }, 500)
 })
 
