@@ -58,18 +58,24 @@ const htmlEditor = monaco.editor.create(document.querySelector('#html-editor'), 
 const jsEditor = monaco.editor.create(document.querySelector('#js-editor'), { ...editorOptions, language: 'javascript' })
 const cssEditor = monaco.editor.create(document.querySelector('#css-editor'), { ...editorOptions, language: 'css' })
 
-// function init () {
-//   // getting the url and splitting the url base64 part by "|" which is "%7C" in url encode
-//   const url = window.location.href.split('/')[3]
-//   const rawHtml = url.split('%7C')[0]
-//   const rawJs = url.split('%7C')[1]
-//   const rawCss = url.split('%7C')[2]
+function init () {
+  // getting the url and splitting the url base64 part by "|" which is "%7C" in url encode
+  const url = window.location.href.split('/')[3]
+  const rawHtml = url.split('%7C')[0]
+  const rawJs = url.split('%7C')[1]
+  const rawCss = url.split('%7C')[2]
 
-//   // setting the values of our editors to the url code , now decoded
-//   htmlEditor.setValue(decode(rawHtml))
-//   jsEditor.setValue(decode(rawJs))
-//   cssEditor.setValue(decode(rawCss))
-// }
+  // setting the values of our editors to the url code , now decoded
+  if (rawHtml) {
+    htmlEditor.setValue(decode(rawHtml))
+  }
+  if (rawJs) {
+    jsEditor.setValue(decode(rawJs))
+  }
+  if (rawCss) {
+    cssEditor.setValue(decode(rawCss))
+  }
+}
 
 // adding debouncing for our 3 editors and also encoding the text in base64 and passing it to the url//
 let renderHtml
@@ -100,9 +106,9 @@ cssEditor.onDidChangeModelContent(e => {
 })
 
 // copy the url when we click on the icon //
-// copyUrlBtn.addEventListener('click', () => {
-//   navigator.clipboard.writeText(window.location.href)
-// })
+copyUrlBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(window.location.href)
+})
 
 // set the font-size every time we change the selected box //
 fontSizeMenu.addEventListener('change', () => {
@@ -164,4 +170,4 @@ function createHtml () {
   </html>
   `
 }
-// init()
+init()
