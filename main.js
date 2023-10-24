@@ -66,9 +66,15 @@ function init () {
   const rawCss = url.split('%7C')[2]
 
   // setting the values of our editors to the url code , now decoded
-  htmlEditor.setValue(decode(rawHtml))
-  jsEditor.setValue(decode(rawJs))
-  cssEditor.setValue(decode(rawCss))
+  if (rawHtml) {
+    htmlEditor.setValue(decode(rawHtml))
+  }
+  if (rawJs) {
+    jsEditor.setValue(decode(rawJs))
+  }
+  if (rawCss) {
+    cssEditor.setValue(decode(rawCss))
+  }
 }
 
 // adding debouncing for our 3 editors and also encoding the text in base64 and passing it to the url//
@@ -115,8 +121,8 @@ fontSizeMenu.addEventListener('change', () => {
 
 themeMenu.addEventListener('change', () => {
   htmlEditor.updateOptions({ theme: themeMenu.value })
-  htmlEditor.updateOptions({ theme: themeMenu.value })
-  htmlEditor.updateOptions({ theme: themeMenu.value })
+  cssEditor.updateOptions({ theme: themeMenu.value })
+  jsEditor.updateOptions({ theme: themeMenu.value })
 })
 
 //  set the theme every time we change the select box //
