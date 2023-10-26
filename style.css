@@ -1,73 +1,209 @@
+
 * {
   padding: 0;
   margin: 0;
   box-sizing: border-box ;
+
 }
+
 body{
   margin: 0;
   padding: 0;
-  overflow: hidden;
   display: flex;
   font-size: 16px;
   background: #242424;
+  height: 100vh;
+  width: 100vw;
+  border: none;
+  background: red;
+  font-family: 'Oswald', sans-serif;
+
 }
 
-/* ////////  LEFT AND RIGHT NAVBARS //////// */
-.left-navbar{
-  font-family: inter;
+header{
+  background: red;
+}
+
+/* TOP NAVBAR */
+.top-navbar{
+  
   background: #373737;
   color: #848383;
   font-weight: bold;
-  height: 100vh;
-  width: 120px;
+  padding: 20px 20px;
+  width: 100%;
+  height: 90px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  grid-area: left-navbar;
-
+  justify-content: center;
+  padding: 0 20px;
+  font-size: 20px;
+  gap: 20px;
+  border-left: 5px solid #424242;
+  
 }
-.right-navbar{
-  font-family: inter;
-  background: #373737;
+
+.top-navbar-buttons {
+  background: #303030;
   color: #848383;
   font-weight: bold;
-  height: 100vh;
-  width: 120px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  grid-area: right-navbar;
-}
-
-.left-navbar  img {
-  padding-top: 2em;
-  width: 60px;
+  font-size: 18px;
+  border: none;
+  border-radius: 5px;
   cursor: pointer;
   transition: all .1s;
+  display: flex;
+  align-items: center;
+  padding: 15px 30px;
+  white-space: nowrap;
+  gap: 8px;
+  font-family: 'Oswald', sans-serif;
+  
+
   &:hover{
     scale: 1.1;
+    color: white;
+    background: #1e1e1e;
   }
   &:active{
     scale: 0.95;
     transition: .01;
+    background: #1e1e1e;
   }
+
+}
+
+main{
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 /* ////////  MAIN CONTENT ///////// */
 
-main {
+.editors-container {
   display: grid;
-  grid-template-areas:  "left-navbar html css  right-navbar"
-                        "left-navbar js iframe right-navbar"   ;
-  height: 100vh;
-  width: 100vw;
+  grid-template: 1fr 1fr / 1fr 1fr;
+  grid-template-areas:  " html css "
+                        " js iframe "   ;
+  height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
   color: white;
   background: rgb(187, 187, 187);
-  font-family: inter;
-  background: #1e1e1e;
+  background: red;
+  background: #373737;
+  z-index: 20px;
+  border-bottom: 20px solid #373737;
 
 }
+
+/* ////////  LEFT NAVBAR //////// */
+
+.left-navbar{
+  background: #373737;
+  color: #848383;
+  font-weight: bold;
+  height: 100%;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  grid-area: left-navbar;
+  padding: 0 2rem;
+
+}
+
+.left-navbar-buttons{
+  background: #303030;
+  color: #848383;
+  font-weight: bold;
+  width: 110px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all .1s;
+  display: flex;
+  align-items: center;
+  padding: 15px 10px;
+  white-space: nowrap;
+  gap: 8px;
+  font-family: 'Oswald', sans-serif;
+
+
+  &:hover{
+    scale: 1.1;
+    color: white;
+    background: #1e1e1e;
+  }
+  &:active{
+    scale: 0.95;
+    transition: .01;
+    background: #1e1e1e;
+    
+  }
+}
+
+.config-icon{
+  border-bottom: 2px solid #424242;
+  display: flex;
+  width: 100%;
+  height: 80px;
+  
+  justify-content: center;
+  padding:  15px 5px;
+  
+}
+
+.buttons-active{
+ color: white;
+ background: #1e1e1e;
+ 
+}
+
+.btn-containers{
+  position: relative;
+}
+
+.drop-down-menu-container{
+  background: #303030 ;
+  margin-top: 5px;
+  position: absolute;
+  z-index: 10;
+  width: 110px;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  padding: 10px 0 ; 
+  font-size: 16px;
+  border-radius: 5px;
+  animation: append-animate .2s  ;
+}
+ 
+.drop-down-menu-container > ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+}
+
+.drop-down-menu-container > ul > li {
+  padding: 2px 0;
+  cursor: pointer;
+  transition: all .1s;
+  &:hover{
+    background: #1e1e1e;
+    font-size: 20px;
+    font-weight: bold;
+    color: white;
+    transition: all 0.1s;
+  }
+}
+
+
 
 /* ////////  EDITORS ///////// */
 #html-editor{
@@ -83,9 +219,7 @@ main {
 
 iframe{
   grid-area: iframe;
-  background: rgb(238, 238, 238);
-  width: 44vw;
-  height: 50vh;
+  background: rgb(226, 226, 226);
 
 }
 
@@ -94,14 +228,17 @@ iframe{
 }
 .containers,iframe{
   border: 5px solid rgb(61, 61, 61);
-  width: 44vw;
-  height: 50vh;
+  width: 100%;
+  height: 100%;
+
+ 
 }
 
 .containers {
   position: relative;
 
 }
+
 /* bg-images  */
 .icons {
   width: 300px;
@@ -114,36 +251,31 @@ iframe{
 
 }
 
-/* //////// SELECT BOXES ///////// */
-select > option {
-  font-family: inter;
-  font-weight: bold;
-  padding: .2em;
-  padding-right: 20px;
-  background: #303030;
-  color: white;&:hover{
-    background: rgb(16, 78, 234);
-    cursor: pointer;
-  }
-}
-
-#theme-menu{
-  background: #303030;
-  height: 120px;
-  
-}
-
-#theme-menu option {
-
-background: #303030;
-&:hover{
-  background: rgb(16, 78, 234);
-}
+/* ABSOLUTE CONTAINERS  */
+.url-copy-container{
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 200px;
+  height: 40px;
+  background: rgb(61, 61, 61);
+  border-radius: 10px;
+  color: white;
+  display: grid;
+  place-items: center;
+  z-index: 20;
+  animation: append-animate .2s  ;
 
 }
-select option:checked{
-  background: rgb(16, 78, 234);
-}
-#theme-menu option:checked{
-  background: rgb(16, 78, 234);
+
+/* ANIMATIONS */
+@keyframes append-animate {
+	from {
+		transform: scale(0);
+		opacity: 0;
+	}
+	to {
+		transform: scale(1);
+		opacity: 1;	
+	}
 }

@@ -10,12 +10,21 @@ import JsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { emmetHTML, emmetCSS, emmetJSX } from 'emmet-monaco-es'
+import { editorOptions } from './src/editorOptions'
+
+// COMPONENTS
+import { fontSizeDropDownMenu, ThemeDropDownMenu, UrlCopyContainer } from './src/components'
+import { removeActiveClasses } from './src/utils'
+
 // fontSize icon and select menu
-const fontSizeMenu = document.querySelector('#font-size-menu')
+const fontSizeButtonContainer = document.querySelector('#font-size-button-container')
+const fontSizeButton = document.querySelector('#font-size-button')
+
 // theme
-const themeMenu = document.querySelector('#theme-menu')
+const themeMenuButton = document.querySelector('#theme-button')
+const themeButtonContainer = document.querySelector('#theme-button-container')
 // copy url icon
-const copyUrlBtn = document.querySelector('#copy-url')
+const copyUrlBtn = document.querySelector('#copy-url-button')
 const page = document.querySelector('#page')
 // setting the emmet support
 emmetHTML(monaco)
@@ -35,24 +44,6 @@ window.MonacoEnvironment = {
   }
 }
 
-// setting up the options for the editors
-const editorOptions = {
-  value: '',
-  language: 'html',
-  theme: 'vs-dark',
-  automaticLayout: true,
-  renderLineHighlight: 'none',
-  fontFamily: 'Cascadia Code',
-  fontSize: '15px',
-  overviewRulerBorder: false,
-  cursorSmoothCaretAnimation: 'on',
-  cursorBlinking: 'expand',
-  cursorWidth: 3,
-  overviewRulerLanes: 0,
-  minimap: { enabled: false },
-  padding: { top: '20px' }
-
-}
 // setting up our 3 editors (html, js, css) //
 const htmlEditor = monaco.editor.create(document.querySelector('#html-editor'), editorOptions)
 const jsEditor = monaco.editor.create(document.querySelector('#js-editor'), { ...editorOptions, language: 'javascript' })
@@ -105,48 +96,81 @@ cssEditor.onDidChangeModelContent(e => {
   }, 500)
 })
 
-// copy the url when we click on the icon //
+// EVENT LISTENERS //
+
+// FONT SIZE BUTTON //
+fontSizeButton.addEventListener('click', (e) => {
+  e.target.classList.toggle('buttons-active')
+  const fontSizeMenu = document.querySelector('#font-size-menu')
+
+  if (fontSizeMenu !== null) {
+    fontSizeMenu.remove()
+  }
+  else {
+    fontSizeButtonContainer.insertAdjacentHTML('beforeend', fontSizeDropDownMenu())
+  }
+  e.stopPropagation()
+})
+
+// THEME BUTTON //
+themeMenuButton.addEventListener('click', (e) => {
+  e.target.classList.toggle('buttons-active')
+  const themeMenu = document.querySelector('#theme-menu')
+  if (themeMenu !== null) {
+    themeMenu.remove()
+  }
+  else {
+    themeButtonContainer.insertAdjacentHTML('beforeend', ThemeDropDownMenu())
+  }
+  e.stopPropagation()
+})
+
+// COPY URL BUTTON //
 copyUrlBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(window.location.href)
+
+  document.body.insertAdjacentHTML('beforeend', UrlCopyContainer())
+  const timer = setTimeout(() => {
+    const urlCopyContainer = document.querySelector('#url-copy-container')
+    urlCopyContainer.remove()
+  }, 1500)
+  return () => clearTimeout(timer)
 })
 
-// set the font-size every time we change the selected box //
-fontSizeMenu.addEventListener('change', () => {
-  htmlEditor.updateOptions({ fontSize: fontSizeMenu.value })
-  cssEditor.updateOptions({ fontSize: fontSizeMenu.value })
-  jsEditor.updateOptions({ fontSize: fontSizeMenu.value })
-})
-
-// set a new editor theme when we change the the select box //
-
-themeMenu.addEventListener('change', () => {
-  htmlEditor.updateOptions({ theme: themeMenu.value })
-  cssEditor.updateOptions({ theme: themeMenu.value })
-  jsEditor.updateOptions({ theme: themeMenu.value })
-})
-
-//  set the theme every time we change the select box //
+//  DROP DOWN MENU EVENT LISTENERS //
 document.addEventListener('click', (e) => {
-  if (e.target.id === 'theme-icon') {
-    themeMenu.size = 10
-    themeMenu.style.zIndex = '10'
+  const fontSizeMenu = document.querySelector('#font-size-menu')
+  const themeMenu = document.querySelector('#theme-menu')
+
+  if (e.target.dataset.id === 'font-size') {
+    htmlEditor.updateOptions({ fontSize: e.target.innerText })
+    cssEditor.updateOptions({ fontSize: e.target.innerText })
+    jsEditor.updateOptions({ fontSize: e.target.innerText })
+    fontSizeMenu.remove()
   }
-  else {
-    themeMenu.size = 1
-    themeMenu.style.zIndex = '-10'
+  if (e.target.dataset.id === 'theme') {
+    htmlEditor.updateOptions({ theme: e.target.innerText })
+    cssEditor.updateOptions({ theme: e.target.innerText })
+    jsEditor.updateOptions({ theme: e.target.innerText })
+    themeMenu.remove()
   }
+
+  removeActiveClasses()
 })
 
-// when we click the font-size icon open the select box //
-document.addEventListener('click', (e) => {
-  if (e.target.id === 'font-size-icon') {
-    fontSizeMenu.style.zIndex = '10'
-    fontSizeMenu.size = 10
+// CLOSE THE DROP DOWN MENU WHEN WE CLICK OUTSIDE OF IT //
+document.addEventListener('mousedown', (e) => {
+  const themeMenu = document.querySelector('#theme-menu')
+  const fontSizeMenu = document.querySelector('#font-size-menu')
+
+  const target = e.target
+  if (themeMenu !== null && themeMenu.contains(target) === false && target !== themeMenuButton) {
+    themeMenu.remove()
+    removeActiveClasses()
   }
-  // when we click outside of it , close it //
-  else {
-    fontSizeMenu.size = 1
-    fontSizeMenu.style.zIndex = '-10'
+  if (fontSizeMenu !== null && fontSizeMenu.contains(target) === false && target !== fontSizeButton) {
+    fontSizeMenu.remove()
+    removeActiveClasses()
   }
 })
 
