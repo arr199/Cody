@@ -28,7 +28,7 @@
           </svg>
       </div>
       <!-- FONT FAMILY -->
-      <div id="font-family-button-container" class="btn-containers">
+      <!-- <div id="font-family-button-container" class="btn-containers">
         <button id="font-family-button" class="left-navbar-buttons">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-font" viewBox="0 0 16 16">
             <path d="M10.943 6H5.057L5 8h.5c.18-1.096.356-1.192 1.694-1.235l.293-.01v5.09c0 .47-.1.582-.898.655v.5H9.41v-.5c-.803-.073-.903-.184-.903-.654V6.755l.298.01c1.338.043 1.514.14 1.694 1.235h.5l-.057-2z"/>
@@ -36,7 +36,7 @@
           </svg>
           Font-Family
         </button>
-      </div>
+      </div> -->
       <!-- FONT SIZE -->
       <div id="font-size-button-container" class="btn-containers">
         <button id="font-size-button" class="left-navbar-buttons">
@@ -65,15 +65,14 @@
       <div id="theme-button-container" class="btn-containers">
     </nav>
   </header>
-
   <main>
       <!-- TOP NAVBAR -->
       <nav class="top-navbar">
-        <button class="top-navbar-buttons"> 
+        <button id="frontend-view-button" class="top-navbar-buttons"> 
           Frontend View
           <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" fill="currentColor" width="24"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm320-320v240h240v-240H520Zm0-80h240v-240H520v240Zm-80 0v-240H200v240h240Zm0 80H200v240h240v-240Z"/></svg>
         </button>
-        <button class="top-navbar-buttons" >
+        <button id="playground-view-button" class="top-navbar-buttons" >
           Playground View
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-layout-split" viewBox="0 0 16 16">
             <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm8.5-1v12H14a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H8.5zm-1 0H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5.5V2z"/>
@@ -81,20 +80,24 @@
         </button>
       </nav>
        <!--  EDITORS  -->
-     <div class="editors-container">
-        <div id="html-editor" class="containers">
+     <div id="editors-container" class="front-end-view">
+        <div id="html-editor" class="editors">
           <img class="icons" src="images/html (1).png">
         </div>
     
-        <div id="css-editor" class="containers">
+        <div id="css-editor" class="editors">
           <img class="icons" src="images/css.png">
         </div>
     
-        <div id="js-editor" class="containers">
+        <div id="js-editor" class="editors">
           <img class="icons" src="images/js.png">
         </div>
         <!--  PREVIEW SCREEN -->
-        <iframe class="containers" id="page" srcdoc="" frameborder="2"></iframe>
+        <iframe class="editors" id="page" srcdoc="" frameborder="2"></iframe>
+        <!-- CONSOLE -->
+        <div id="console" class="console editors">
+        </div>
+   
     </div>
   </main>
 

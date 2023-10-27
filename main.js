@@ -1,3 +1,4 @@
+/* eslint-disable no-new-func */
 /* eslint-disable brace-style */
 // TODO LIST //
 // short the link
@@ -15,6 +16,7 @@ import { editorOptions } from './src/editorOptions'
 // COMPONENTS
 import { fontSizeDropDownMenu, ThemeDropDownMenu, UrlCopyContainer } from './src/components'
 import { removeActiveClasses } from './src/utils'
+import { errorSvg, logsSvg } from './src/svgs'
 
 // fontSize icon and select menu
 const fontSizeButtonContainer = document.querySelector('#font-size-button-container')
@@ -26,6 +28,13 @@ const themeButtonContainer = document.querySelector('#theme-button-container')
 // copy url icon
 const copyUrlBtn = document.querySelector('#copy-url-button')
 const page = document.querySelector('#page')
+// top navbar buttons
+const frontEndButton = document.querySelector('#frontend-view-button')
+const playgroundButton = document.querySelector('#playground-view-button')
+
+// console
+const consoleElement = document.querySelector('#console')
+
 // setting the emmet support
 emmetHTML(monaco)
 emmetCSS(monaco)
@@ -78,13 +87,34 @@ htmlEditor.onDidChangeModelContent(e => {
   }, 500)
 })
 
+function getColor (value) {
+  if (value === undefined || value === null || typeof value === 'boolean' || value === 'NaN' || value === 'Infinity' || value === '-Infinity') {
+    return 'orange'
+  }
+  if (typeof value === 'number') {
+    return 'orange'
+  }
+  else return 'rgb(57, 211, 134)'
+}
+
 let renderJs
 jsEditor.onDidChangeModelContent(e => {
   clearTimeout(renderJs)
   renderJs = setTimeout(() => {
     page.setAttribute('srcdoc', createHtml())
     history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-  }, 2000)
+    const jsCode = jsEditor.getValue()
+    const capturedOutput = []
+    const customConsole = { log: (...message) => capturedOutput.push(message.map(arg => arg)) }
+
+    try {
+      new Function('console', jsCode).call({ console: customConsole }, customConsole)
+    } catch (error) {
+      consoleElement.innerHTML = capturedOutput.map(message => `<span class="error">${errorSvg} ${message}</span>`).join(' ')
+    }
+    consoleElement.innerHTML = capturedOutput.map(message => `<div  class='string-log'>${logsSvg}  ${message
+      .map(e => `<span style="color:${getColor(e)}"> ${typeof e === 'object' ? JSON.stringify(e) : e}</span>`).join(' ')}</div>`).join(' ')
+  }, 1500)
 })
 
 let renderCss
@@ -97,6 +127,32 @@ cssEditor.onDidChangeModelContent(e => {
 })
 
 // EVENT LISTENERS //
+
+// FRONTEND VIEW BUTTON //
+frontEndButton.addEventListener('click', () => {
+  const editorsEl = Array.from(document.querySelectorAll('.editors'))
+  const editorsContainer = document.querySelector('#editors-container')
+
+  editorsEl.forEach(editor => {
+    editor.style.display = 'block'
+  })
+  editorsContainer.classList.remove('playground-view')
+  editorsContainer.classList.add('front-end-view')
+})
+
+// PLAYGROUND VIEW BUTTON //
+playgroundButton.addEventListener('click', () => {
+  const editorsEl = Array.from(document.querySelectorAll('.editors'))
+  const editorsContainer = document.querySelector('#editors-container')
+
+  editorsEl.forEach(editor => {
+    if (editor.id !== 'console' && editor.id !== 'js-editor') {
+      editor.style.display = 'none'
+    }
+  })
+  editorsContainer.classList.remove('front-end-view')
+  editorsContainer.classList.add('playground-view')
+})
 
 // FONT SIZE BUTTON //
 fontSizeButton.addEventListener('click', (e) => {
@@ -194,4 +250,19 @@ function createHtml () {
   </html>
   `
 }
+
 init()
+
+let renderErrors
+monaco.editor.onDidChangeMarkers(([uri]) => {
+  clearTimeout(renderErrors)
+  renderErrors = setTimeout(() => {
+    const markers = monaco.editor.getModelMarkers({ resource: uri })
+
+    markers.forEach(
+      ({ message, startLineNumber, owner }) => {
+        consoleElement.innerHTML += ('beforeend', `<span class="error"> ${errorSvg} ${owner} Line ${startLineNumber}:  ${message}</span>`)
+      }
+    )
+  }, 1500)
+})

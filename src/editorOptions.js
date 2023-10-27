@@ -12,6 +12,7 @@ export const editorOptions = {
   cursorWidth: 3,
   overviewRulerLanes: 0,
   minimap: { enabled: false },
-  padding: { top: '20px' }
+  padding: { top: '20px' },
+  codeLens: true
 
 }
