@@ -275,6 +275,7 @@ iframe{
 
 /* ABSOLUTE CONTAINERS  */
 .url-copy-container{
+  display: none;
   position: absolute;
   inset: 0;
   margin: auto;
@@ -283,7 +284,6 @@ iframe{
   background: rgb(61, 61, 61);
   border-radius: 10px;
   color: white;
-  display: grid;
   place-items: center;
   z-index: 20;
   animation: append-animate .2s  ;

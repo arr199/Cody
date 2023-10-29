@@ -1,71 +1,38 @@
 /* eslint-disable no-new-func */
 /* eslint-disable brace-style */
-// TODO LIST //
-// short the link
-// fix the left-navbar buttons // ✅
 import { encode, decode } from 'js-base64'
-// importing monaco editor and our workers
-import * as monaco from 'monaco-editor'
-import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
-import JsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
-import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-import { emmetHTML, emmetCSS, emmetJSX } from 'emmet-monaco-es'
-import { editorOptions } from './src/editorOptions'
-
+import { htmlEditor, cssEditor, jsEditor, createHtml } from './src/monaco/editors'
 // COMPONENTS
-import { fontSizeDropDownMenu, ThemeDropDownMenu, UrlCopyContainer } from './src/components'
-import { removeActiveClasses } from './src/utils'
-import { errorSvg, logsSvg } from './src/svgs'
+import { FontSizeMenu } from './src/components/FontSizeMenu'
+import { ThemeMenu } from './src/components/ThemeMenu'
+import { removeActiveClasses } from './src/utils/functions'
+import { API } from './src/utils/API'
+import { getErrors } from './src/monaco/getErrors'
+import { getConsoleLogs } from './src/monaco/getConsoleLogs'
 
-// fontSize icon and select menu
+// FONT-SIZE ICON AND SELECT MENU
 const fontSizeButtonContainer = document.querySelector('#font-size-button-container')
 const fontSizeButton = document.querySelector('#font-size-button')
-
-// theme
+// THEME
 const themeMenuButton = document.querySelector('#theme-button')
 const themeButtonContainer = document.querySelector('#theme-button-container')
-// copy url icon
+// COPY URL
 const copyUrlBtn = document.querySelector('#copy-url-button')
+const urlCopyContainer = document.querySelector('#url-copy-container')
+
 const page = document.querySelector('#page')
-// top navbar buttons
+// TOP NAVBAR BUTTONS
 const frontEndButton = document.querySelector('#frontend-view-button')
 const playgroundButton = document.querySelector('#playground-view-button')
 
-// console
-const consoleElement = document.querySelector('#console')
-
-// setting the emmet support
-emmetHTML(monaco)
-emmetCSS(monaco)
-emmetJSX(monaco)
-
-window.MonacoEnvironment = {
-  getWorker (workerId, label) {
-    if (label === 'html') {
-      return new HtmlWorker()
-    } else if (label === 'css') {
-      return new CssWorker()
-    } else if (label === 'javascript') {
-      return new JsWorker()
-    }
-    else return EditorWorker()
-  }
-}
-
-// setting up our 3 editors (html, js, css) //
-const htmlEditor = monaco.editor.create(document.querySelector('#html-editor'), editorOptions)
-const jsEditor = monaco.editor.create(document.querySelector('#js-editor'), { ...editorOptions, language: 'javascript' })
-const cssEditor = monaco.editor.create(document.querySelector('#css-editor'), { ...editorOptions, language: 'css' })
-
 function init () {
-  // getting the url and splitting the url base64 part by "|" which is "%7C" in url encode
+  // GETTING THE URL AND SPLITTING THE URL BASE64 PART BY "|" WHICH IS "%7C" IN URL ENCODE
   const url = window.location.href.split('/')[3]
   const rawHtml = url.split('%7C')[0]
   const rawJs = url.split('%7C')[1]
   const rawCss = url.split('%7C')[2]
 
-  // setting the values of our editors to the url code , now decoded
+  // SETTING THE VALUES OF OUR EDITORS TO THE URL CODE , NOW DECODED
   if (rawHtml) {
     htmlEditor.setValue(decode(rawHtml))
   }
@@ -77,25 +44,15 @@ function init () {
   }
 }
 
-// adding debouncing for our 3 editors and also encoding the text in base64 and passing it to the url//
+// ADDING DEBOUNCING FOR OUR 3 EDITORS AND ALSO ENCODING THE TEXT IN BASE64 AND PASSING IT TO THE URL//
 let renderHtml
 htmlEditor.onDidChangeModelContent(e => {
   clearTimeout(renderHtml)
-  renderHtml = setTimeout(() => { // we add "|"  between every editor encode text in order to know later//
-    page.setAttribute('srcdoc', createHtml()) // which part of the url represent our exact editor //
+  renderHtml = setTimeout(() => { // WE ADD "|"  BETWEEN EVERY EDITOR CODE IN ORDER TO KNOW LATER//
+    page.setAttribute('srcdoc', createHtml()) // WHICH PART OF THE URL REPRESENT OUR EXACT EDITOR //
     history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
   }, 500)
 })
-
-function getColor (value) {
-  if (value === undefined || value === null || typeof value === 'boolean' || value === 'NaN' || value === 'Infinity' || value === '-Infinity') {
-    return 'orange'
-  }
-  if (typeof value === 'number') {
-    return 'orange'
-  }
-  else return 'rgb(57, 211, 134)'
-}
 
 let renderJs
 jsEditor.onDidChangeModelContent(e => {
@@ -103,17 +60,7 @@ jsEditor.onDidChangeModelContent(e => {
   renderJs = setTimeout(() => {
     page.setAttribute('srcdoc', createHtml())
     history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-    const jsCode = jsEditor.getValue()
-    const capturedOutput = []
-    const customConsole = { log: (...message) => capturedOutput.push(message.map(arg => arg)) }
-
-    try {
-      new Function('console', jsCode).call({ console: customConsole }, customConsole)
-    } catch (error) {
-      consoleElement.innerHTML = capturedOutput.map(message => `<span class="error">${errorSvg} ${message}</span>`).join(' ')
-    }
-    consoleElement.innerHTML = capturedOutput.map(message => `<div  class='string-log'>${logsSvg}  ${message
-      .map(e => `<span style="color:${getColor(e)}"> ${typeof e === 'object' ? JSON.stringify(e) : e}</span>`).join(' ')}</div>`).join(' ')
+    getConsoleLogs()
   }, 1500)
 })
 
@@ -125,8 +72,10 @@ cssEditor.onDidChangeModelContent(e => {
     history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
   }, 500)
 })
+// GETTING THE EDITOR MARKERS (ERRORS) //
+getErrors()
 
-// EVENT LISTENERS //
+/// //// EVENT LISTENERS //////
 
 // FRONTEND VIEW BUTTON //
 frontEndButton.addEventListener('click', () => {
@@ -163,7 +112,7 @@ fontSizeButton.addEventListener('click', (e) => {
     fontSizeMenu.remove()
   }
   else {
-    fontSizeButtonContainer.insertAdjacentHTML('beforeend', fontSizeDropDownMenu())
+    fontSizeButtonContainer.insertAdjacentHTML('beforeend', FontSizeMenu())
   }
   e.stopPropagation()
 })
@@ -176,21 +125,32 @@ themeMenuButton.addEventListener('click', (e) => {
     themeMenu.remove()
   }
   else {
-    themeButtonContainer.insertAdjacentHTML('beforeend', ThemeDropDownMenu())
+    themeButtonContainer.insertAdjacentHTML('beforeend', ThemeMenu())
   }
   e.stopPropagation()
 })
 
 // COPY URL BUTTON //
+let disableTimer
 copyUrlBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(window.location.href)
+  clearTimeout(disableTimer)
 
-  document.body.insertAdjacentHTML('beforeend', UrlCopyContainer())
-  const timer = setTimeout(() => {
-    const urlCopyContainer = document.querySelector('#url-copy-container')
-    urlCopyContainer.remove()
-  }, 1500)
-  return () => clearTimeout(timer)
+  urlCopyContainer.style.display = 'grid'
+  disableTimer = setTimeout(() => {
+    urlCopyContainer.style.display = 'none'
+
+    const urlContent = window.location.href
+    // SENDING OUR ULR TO THE BACKEND AND GETTING THE SHORTENED VERSION OF IT //
+    fetch(API.LINK_SHORTENER_URL, {
+      method: 'POST',
+      body: JSON.stringify({ content: urlContent }),
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        navigator.clipboard.writeText(data.link)
+      })
+  }, 1000)
 })
 
 //  DROP DOWN MENU EVENT LISTENERS //
@@ -230,39 +190,4 @@ document.addEventListener('mousedown', (e) => {
   }
 })
 
-function createHtml () {
-  return `
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>${cssEditor.getValue()}</style>
-  </head>
-  <body>
-    ${htmlEditor.getValue()}
-    <script>
-    ${jsEditor.getValue()}
-    </script> 
-  </body>
-  </html>
-  `
-}
-
 init()
-
-let renderErrors
-monaco.editor.onDidChangeMarkers(([uri]) => {
-  clearTimeout(renderErrors)
-  renderErrors = setTimeout(() => {
-    const markers = monaco.editor.getModelMarkers({ resource: uri })
-
-    markers.forEach(
-      ({ message, startLineNumber, owner }) => {
-        consoleElement.innerHTML += ('beforeend', `<span class="error"> ${errorSvg} ${owner} Line ${startLineNumber}:  ${message}</span>`)
-      }
-    )
-  }, 1500)
-})
