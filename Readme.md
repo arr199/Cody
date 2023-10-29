@@ -6,9 +6,9 @@ A playground to test your JavaScript, CSS, and HTML skills.
 
 ### Features
 
-[Coding in JS, CSS, and HTML] - Users can write and edit their JavaScript, CSS, and HTML code all in one place. It's your canvas for web development.
+- [Coding in JS, CSS, and HTML] - Users can write and edit their JavaScript, CSS, and HTML code all in one place. It's your canvas for web development.
 
-Live Website Preview: - See your website come to life instantly! As you code, you can view the changes in real-time, making it easy to test and refine your design.
+- Live Website Preview: - See your website come to life instantly! As you code, you can view the changes in real-time, making it easy to test and refine your design.
 
 Console Interaction: - Debugging is a breeze. The console is right there, ready to display error messages, logs, and responses, helping you perfect your code.
 
