@@ -3,7 +3,6 @@ import { jsEditor } from './editors'
 import { errorSvg, logsSvg } from '../utils/svgs'
 import { getColor } from '../utils/functions'
 
-// GETTING THE CONSOLE LOGS //
 export function getConsoleLogs () {
   const consoleElement = document.querySelector('#console')
 
