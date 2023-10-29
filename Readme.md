@@ -2,7 +2,9 @@
 
 A playground to test your JavaScript, CSS, and HTML skills.
 
-🌐 <img  width="50%" src="./public/cody.png" />
+ <img  width="50%" src="./public/cody.png" />
+
+ 🌐 [Website](https://cody-studio.netlify.app)
 
 <h2>Features ⚙️</h2> 
 
