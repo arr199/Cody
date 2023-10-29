@@ -1,71 +1,38 @@
+/* eslint-disable no-new-func */
 /* eslint-disable brace-style */
-// TODO LIST //
-// short the link
-// fix the left-navbar buttons // ✅
 import { encode, decode } from 'js-base64'
-// importing monaco editor and our workers
-import * as monaco from 'monaco-editor'
-import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
-import JsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
-import CssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-import { emmetHTML, emmetCSS, emmetJSX } from 'emmet-monaco-es'
-// fontSize icon and select menu
-const fontSizeMenu = document.querySelector('#font-size-menu')
-// theme
-const themeMenu = document.querySelector('#theme-menu')
-// copy url icon
-const copyUrlBtn = document.querySelector('#copy-url')
+import { htmlEditor, cssEditor, jsEditor, createHtml } from './src/monaco/editors'
+// COMPONENTS
+import { FontSizeMenu } from './src/components/FontSizeMenu'
+import { ThemeMenu } from './src/components/ThemeMenu'
+import { removeActiveClasses } from './src/utils/functions'
+import { API } from './src/utils/API'
+import { getErrors } from './src/monaco/getErrors'
+import { getConsoleLogs } from './src/monaco/getConsoleLogs'
+
+// FONT-SIZE ICON AND SELECT MENU
+const fontSizeButtonContainer = document.querySelector('#font-size-button-container')
+const fontSizeButton = document.querySelector('#font-size-button')
+// THEME
+const themeMenuButton = document.querySelector('#theme-button')
+const themeButtonContainer = document.querySelector('#theme-button-container')
+// COPY URL
+const copyUrlBtn = document.querySelector('#copy-url-button')
+const urlCopyContainer = document.querySelector('#url-copy-container')
+
 const page = document.querySelector('#page')
-// setting the emmet support
-emmetHTML(monaco)
-emmetCSS(monaco)
-emmetJSX(monaco)
-
-window.MonacoEnvironment = {
-  getWorker (workerId, label) {
-    if (label === 'html') {
-      return new HtmlWorker()
-    } else if (label === 'css') {
-      return new CssWorker()
-    } else if (label === 'javascript') {
-      return new JsWorker()
-    }
-    else return EditorWorker()
-  }
-}
-
-// setting up the options for the editors
-const editorOptions = {
-  value: '',
-  language: 'html',
-  theme: 'vs-dark',
-  automaticLayout: true,
-  renderLineHighlight: 'none',
-  fontFamily: 'Cascadia Code',
-  fontSize: '15px',
-  overviewRulerBorder: false,
-  cursorSmoothCaretAnimation: 'on',
-  cursorBlinking: 'expand',
-  cursorWidth: 3,
-  overviewRulerLanes: 0,
-  minimap: { enabled: false },
-  padding: { top: '20px' }
-
-}
-// setting up our 3 editors (html, js, css) //
-const htmlEditor = monaco.editor.create(document.querySelector('#html-editor'), editorOptions)
-const jsEditor = monaco.editor.create(document.querySelector('#js-editor'), { ...editorOptions, language: 'javascript' })
-const cssEditor = monaco.editor.create(document.querySelector('#css-editor'), { ...editorOptions, language: 'css' })
+// TOP NAVBAR BUTTONS
+const frontEndButton = document.querySelector('#frontend-view-button')
+const playgroundButton = document.querySelector('#playground-view-button')
 
 function init () {
-  // getting the url and splitting the url base64 part by "|" which is "%7C" in url encode
+  // GETTING THE URL AND SPLITTING THE URL BASE64 PART BY "|" WHICH IS "%7C" IN URL ENCODE
   const url = window.location.href.split('/')[3]
   const rawHtml = url.split('%7C')[0]
   const rawJs = url.split('%7C')[1]
   const rawCss = url.split('%7C')[2]
 
-  // setting the values of our editors to the url code , now decoded
+  // SETTING THE VALUES OF OUR EDITORS TO THE URL CODE , NOW DECODED
   if (rawHtml) {
     htmlEditor.setValue(decode(rawHtml))
   }
@@ -77,12 +44,12 @@ function init () {
   }
 }
 
-// adding debouncing for our 3 editors and also encoding the text in base64 and passing it to the url//
+// ADDING DEBOUNCING FOR OUR 3 EDITORS AND ALSO ENCODING THE TEXT IN BASE64 AND PASSING IT TO THE URL//
 let renderHtml
 htmlEditor.onDidChangeModelContent(e => {
   clearTimeout(renderHtml)
-  renderHtml = setTimeout(() => { // we add "|"  between every editor encode text in order to know later//
-    page.setAttribute('srcdoc', createHtml()) // which part of the url represent our exact editor //
+  renderHtml = setTimeout(() => { // WE ADD "|"  BETWEEN EVERY EDITOR CODE IN ORDER TO KNOW LATER//
+    page.setAttribute('srcdoc', createHtml()) // WHICH PART OF THE URL REPRESENT OUR EXACT EDITOR //
     history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
   }, 500)
 })
@@ -93,7 +60,8 @@ jsEditor.onDidChangeModelContent(e => {
   renderJs = setTimeout(() => {
     page.setAttribute('srcdoc', createHtml())
     history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-  }, 2000)
+    getConsoleLogs()
+  }, 1500)
 })
 
 let renderCss
@@ -104,70 +72,122 @@ cssEditor.onDidChangeModelContent(e => {
     history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
   }, 500)
 })
+// GETTING THE EDITOR MARKERS (ERRORS) //
+getErrors()
 
-// copy the url when we click on the icon //
+/// //// EVENT LISTENERS //////
+
+// FRONTEND VIEW BUTTON //
+frontEndButton.addEventListener('click', () => {
+  const editorsEl = Array.from(document.querySelectorAll('.editors'))
+  const editorsContainer = document.querySelector('#editors-container')
+
+  editorsEl.forEach(editor => {
+    editor.style.display = 'block'
+  })
+  editorsContainer.classList.remove('playground-view')
+  editorsContainer.classList.add('front-end-view')
+})
+
+// PLAYGROUND VIEW BUTTON //
+playgroundButton.addEventListener('click', () => {
+  const editorsEl = Array.from(document.querySelectorAll('.editors'))
+  const editorsContainer = document.querySelector('#editors-container')
+
+  editorsEl.forEach(editor => {
+    if (editor.id !== 'console' && editor.id !== 'js-editor') {
+      editor.style.display = 'none'
+    }
+  })
+  editorsContainer.classList.remove('front-end-view')
+  editorsContainer.classList.add('playground-view')
+})
+
+// FONT SIZE BUTTON //
+fontSizeButton.addEventListener('click', (e) => {
+  e.target.classList.toggle('buttons-active')
+  const fontSizeMenu = document.querySelector('#font-size-menu')
+
+  if (fontSizeMenu !== null) {
+    fontSizeMenu.remove()
+  }
+  else {
+    fontSizeButtonContainer.insertAdjacentHTML('beforeend', FontSizeMenu())
+  }
+  e.stopPropagation()
+})
+
+// THEME BUTTON //
+themeMenuButton.addEventListener('click', (e) => {
+  e.target.classList.toggle('buttons-active')
+  const themeMenu = document.querySelector('#theme-menu')
+  if (themeMenu !== null) {
+    themeMenu.remove()
+  }
+  else {
+    themeButtonContainer.insertAdjacentHTML('beforeend', ThemeMenu())
+  }
+  e.stopPropagation()
+})
+
+// COPY URL BUTTON //
+let disableTimer
 copyUrlBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(window.location.href)
+  clearTimeout(disableTimer)
+
+  urlCopyContainer.style.display = 'grid'
+  disableTimer = setTimeout(() => {
+    urlCopyContainer.style.display = 'none'
+
+    const urlContent = window.location.href
+    // SENDING OUR ULR TO THE BACKEND AND GETTING THE SHORTENED VERSION OF IT //
+    fetch(API.LINK_SHORTENER_URL, {
+      method: 'POST',
+      body: JSON.stringify({ content: urlContent }),
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        navigator.clipboard.writeText(data.link)
+      })
+  }, 1000)
 })
 
-// set the font-size every time we change the selected box //
-fontSizeMenu.addEventListener('change', () => {
-  htmlEditor.updateOptions({ fontSize: fontSizeMenu.value })
-  cssEditor.updateOptions({ fontSize: fontSizeMenu.value })
-  jsEditor.updateOptions({ fontSize: fontSizeMenu.value })
-})
-
-// set a new editor theme when we change the the select box //
-
-themeMenu.addEventListener('change', () => {
-  htmlEditor.updateOptions({ theme: themeMenu.value })
-  cssEditor.updateOptions({ theme: themeMenu.value })
-  jsEditor.updateOptions({ theme: themeMenu.value })
-})
-
-//  set the theme every time we change the select box //
+//  DROP DOWN MENU EVENT LISTENERS //
 document.addEventListener('click', (e) => {
-  if (e.target.id === 'theme-icon') {
-    themeMenu.size = 10
-    themeMenu.style.zIndex = '10'
+  const fontSizeMenu = document.querySelector('#font-size-menu')
+  const themeMenu = document.querySelector('#theme-menu')
+
+  if (e.target.dataset.id === 'font-size') {
+    htmlEditor.updateOptions({ fontSize: e.target.innerText })
+    cssEditor.updateOptions({ fontSize: e.target.innerText })
+    jsEditor.updateOptions({ fontSize: e.target.innerText })
+    fontSizeMenu.remove()
   }
-  else {
-    themeMenu.size = 1
-    themeMenu.style.zIndex = '-10'
+  if (e.target.dataset.id === 'theme') {
+    htmlEditor.updateOptions({ theme: e.target.innerText })
+    cssEditor.updateOptions({ theme: e.target.innerText })
+    jsEditor.updateOptions({ theme: e.target.innerText })
+    themeMenu.remove()
+  }
+
+  removeActiveClasses()
+})
+
+// CLOSE THE DROP DOWN MENU WHEN WE CLICK OUTSIDE OF IT //
+document.addEventListener('mousedown', (e) => {
+  const themeMenu = document.querySelector('#theme-menu')
+  const fontSizeMenu = document.querySelector('#font-size-menu')
+
+  const target = e.target
+  if (themeMenu !== null && themeMenu.contains(target) === false && target !== themeMenuButton) {
+    themeMenu.remove()
+    removeActiveClasses()
+  }
+  if (fontSizeMenu !== null && fontSizeMenu.contains(target) === false && target !== fontSizeButton) {
+    fontSizeMenu.remove()
+    removeActiveClasses()
   }
 })
 
-// when we click the font-size icon open the select box //
-document.addEventListener('click', (e) => {
-  if (e.target.id === 'font-size-icon') {
-    fontSizeMenu.style.zIndex = '10'
-    fontSizeMenu.size = 10
-  }
-  // when we click outside of it , close it //
-  else {
-    fontSizeMenu.size = 1
-    fontSizeMenu.style.zIndex = '-10'
-  }
-})
-
-function createHtml () {
-  return `
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>${cssEditor.getValue()}</style>
-  </head>
-  <body>
-    ${htmlEditor.getValue()}
-    <script>
-    ${jsEditor.getValue()}
-    </script> 
-  </body>
-  </html>
-  `
-}
 init()
