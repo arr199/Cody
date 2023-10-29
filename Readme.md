@@ -4,7 +4,7 @@ A playground to test your JavaScript, CSS, and HTML skills.
 
 <img  width="50%" src="./public/cody.png" />
 
-### Features
+### Features ###
 
 - [Coding in JS, CSS, and HTML] - Users can write and edit their JavaScript, CSS, and HTML code all in one place. It's your canvas for web development.
 
