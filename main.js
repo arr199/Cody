@@ -5,6 +5,7 @@ import { htmlEditor, cssEditor, jsEditor, createHtml } from './src/monaco/editor
 // COMPONENTS
 import { FontSizeMenu } from './src/components/FontSizeMenu'
 import { ThemeMenu } from './src/components/ThemeMenu'
+
 import { removeActiveClasses } from './src/utils/functions'
 import { API } from './src/utils/API'
 import { getErrors } from './src/monaco/getErrors'
