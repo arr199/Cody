@@ -23,7 +23,9 @@ A playground to test your JavaScript, CSS, and HTML skills.
 - [Monaco-Editor](https://www.npmjs.com/package/monaco-editor#monaco-editor) -  The text editor that powers VS Code.
 - [NodeJs](https://nodejs.org/en) - A JavaScript runtime environment.
 - [ExpressJs](https://expressjs.com/) - A web framework for NodeJs.
-- [Vite](https://vitejs.dev/) - A tool that is used for building fast and optimized web applications. 
+- [MongoDB Atlas](https://www.mongodb.com/docs/atlas/) - A multi-cloud database service.
+- [Vite](https://vitejs.dev/) - A tool that is used for building fast and optimized web applications.
+  
 
 
 
