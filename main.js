@@ -141,7 +141,7 @@ copyUrlBtn.addEventListener('click', () => {
     urlCopyContainer.style.display = 'none'
 
     const urlContent = window.location.href
-    // SENDING OUR ULR TO THE BACKEND AND GETTING THE SHORTENED VERSION OF IT //
+    // SENDING OUR URL TO THE BACKEND AND GETTING THE SHORTENED VERSION OF IT //
     fetch(API.LINK_SHORTENER_URL, {
       method: 'POST',
       body: JSON.stringify({ content: urlContent }),
@@ -175,7 +175,7 @@ document.addEventListener('click', (e) => {
   removeActiveClasses()
 })
 
-// CLOSE THE DROP DOWN MENU WHEN WE CLICK OUTSIDE OF IT //
+// CLOSE THE DROP-DOWN MENU WHEN WE CLICK OUTSIDE OF IT //
 document.addEventListener('mousedown', (e) => {
   const themeMenu = document.querySelector('#theme-menu')
   const fontSizeMenu = document.querySelector('#font-size-menu')
