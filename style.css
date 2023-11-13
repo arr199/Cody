@@ -223,8 +223,10 @@ iframe{
   gap: 4px;
   color: rgb(255, 105, 105);
   background: #4b0408;
-  min-width: 100%;
+  width: 100%;
+  min-width: max-content;
   padding: 2px 0;
+  
 }
 
 .string-log{
@@ -233,7 +235,8 @@ iframe{
   gap: 4px;
   color: rgb(57, 211, 134);
   background: #044b10;
-  min-width: 100%;
+  width: 100%;
+  min-width: max-content;
   padding: 2px 0;
 
 
