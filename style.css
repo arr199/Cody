@@ -18,12 +18,6 @@ body{
   font-family: 'Oswald', sans-serif;
 }
 
-header{
-
-}
-
-
-
 /* TOP NAVBAR */
 .top-navbar{
   
@@ -187,8 +181,6 @@ main{
   }
 }
 
-
-
 /* ////////  EDITORS ///////// */
 #html-editor{
   grid-area: html;
@@ -220,6 +212,9 @@ iframe{
   font-size: 14px;
   word-spacing: 2px;
   letter-spacing: 1px;
+  overflow-x: auto;
+  min-width: 100%;
+  
 }
 
 .error{
@@ -229,7 +224,9 @@ iframe{
   color: rgb(255, 105, 105);
   background: #4b0408;
   width: 100%;
+  min-width: max-content;
   padding: 2px 0;
+  
 }
 
 .string-log{
@@ -239,11 +236,15 @@ iframe{
   color: rgb(57, 211, 134);
   background: #044b10;
   width: 100%;
+  min-width: max-content;
   padding: 2px 0;
+
 
 }
 
-
+.logsvg-span{
+ display: flex;
+}
 
 .icon-labels{
   margin-top: 10px;
@@ -252,7 +253,6 @@ iframe{
   border: 5px solid rgb(61, 61, 61);
   width: 100%;
   height: 100%;
-
  
 }
 

@@ -16,7 +16,7 @@ export function getConsoleLogs () {
     consoleElement.innerHTML = capturedOutput.map(message => `<span class="error">${errorSvg} ${message}</span>`).join(' ')
   }
   consoleElement.innerHTML = capturedOutput.map(message =>
-    `<div  class='string-log'>${logsSvg}  ${message
+    `<div  class='string-log'><span class="logsvg-span">${logsSvg}</span>   ${message
        .map(e => `<span style="color:${getColor(e)}"> ${typeof e === 'object' ? JSON.stringify(e) : e}</span>`)
        .join(' ')}
     </div>`)
