@@ -5,11 +5,12 @@ export function removeActiveClasses () {
   })
 }
 //  GET COLOR FOR CONSOLE LOG //
-export function getColor (value) {
-  if (value === undefined || value === null || typeof value === 'boolean' || value === 'NaN' || value === 'Infinity' || value === '-Infinity') {
-    return 'orange'
-  }
-  if (typeof value === 'number') {
-    return 'orange'
-  } else return 'rgb(57, 211, 134)'
+export function getLogColor (type) {
+  if (type === 'error') return 'rgb(255, 105, 105)'
+  return 'rgb(57, 211, 134)'
+}
+
+export function getLogClass (type) {
+  if (type === 'error') return 'error'
+  return 'string-log'
 }

@@ -1,24 +1,23 @@
-/* eslint-disable no-new-func */
-import { jsEditor } from './editors'
 import { errorSvg, logsSvg } from '../utils/svgs'
-import { getColor } from '../utils/functions'
+import { getLogColor, getLogClass } from '../utils/functions'
 
 export function getConsoleLogs () {
-  const consoleElement = document.querySelector('#console')
+  const page = document.querySelector('#page')
+  const capturedLogs = []
 
-  const jsCode = jsEditor.getValue()
-  const capturedOutput = []
-  const customConsole = { log: (...message) => capturedOutput.push(message.map(arg => arg)) }
+  window.addEventListener('message', (e) => {
+    if (e.source !== page.contentWindow) return
+    const { logs, type } = e.data.console
+    const consoleElement = document.querySelector('#console')
 
-  try {
-    new Function('console', jsCode).call({ console: customConsole }, customConsole)
-  } catch (error) {
-    consoleElement.innerHTML = capturedOutput.map(message => `<span class="error">${errorSvg} ${message}</span>`).join(' ')
-  }
-  consoleElement.innerHTML = capturedOutput.map(message =>
-    `<div  class='string-log'>${logsSvg}  ${message
-       .map(e => `<span style="color:${getColor(e)}"> ${typeof e === 'object' ? JSON.stringify(e) : e}</span>`)
+    capturedLogs.push({ logs: JSON.parse(logs), type })
+    consoleElement.innerHTML = capturedLogs.map(({ logs, type }) =>
+    // WHOLE CONSOLE LOG LINE
+    `<div  class='${getLogClass(type)}'>${type === 'error' ? errorSvg : logsSvg}  
+
+    ${logs.map(e => `<span style="color:${getLogColor(type)}"> ${typeof e === 'object' ? JSON.stringify(e) : e}</span>`) // EACH INDIVIDUAL ARG OF THE CONSOLE.LOG
        .join(' ')}
     </div>`)
-    .join(' ')
+      .join(' ')
+  })
 }

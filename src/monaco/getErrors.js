@@ -7,6 +7,7 @@ export function getErrors () {
   let renderErrors
   monaco.editor.onDidChangeMarkers(([uri]) => {
     clearTimeout(renderErrors)
+    consoleElement.innerHTML = ''
     renderErrors = setTimeout(() => {
       const markers = monaco.editor.getModelMarkers({ resource: uri })
 
