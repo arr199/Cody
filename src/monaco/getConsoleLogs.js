@@ -9,16 +9,14 @@ export function getConsoleLogs () {
     const { logs, type } = e.data.console
     const consoleElement = document.querySelector('#console')
 
-    capturedLogs.push({ logs: JSON.parse(logs), type, id: crypto.randomUUID() })
-    const renderElements = capturedLogs.reduce((acc, curr) => {
-      if (!acc.find(item => item.id === curr.id)) {
-        acc.push(curr)
-      }
+    if (capturedLogs.length > 0 && capturedLogs.every((e) => JSON.stringify(e.logs) !== logs)) {
+      capturedLogs.push({ logs: JSON.parse(logs), type })
+    }
+    if (capturedLogs.length === 0) {
+      capturedLogs.push({ logs: JSON.parse(logs), type })
+    }
 
-      return acc
-    }, [])
-
-    consoleElement.innerHTML = renderElements.map(({ logs, type }) =>
+    consoleElement.innerHTML = capturedLogs.map(({ logs, type }) =>
     // WHOLE CONSOLE LOG LINE
     `<div  class='${getLogClass(type)}'>${type === 'error' ? errorSvg : logsSvg}  
 
