@@ -40,7 +40,7 @@ body{
 
 .top-navbar-buttons {
   background: #303030;
-  color: #848383;
+  color: #dddddd;
   font-weight: bold;
   font-size: 18px;
   border: none;
@@ -98,7 +98,7 @@ main{
 
 .left-navbar-buttons{
   background: #303030;
-  color: #848383;
+  color: #dddddd;
   font-weight: bold;
   width: 110px;
   border: none;
@@ -160,6 +160,7 @@ main{
   font-size: 16px;
   border-radius: 5px;
   animation: append-animate .2s  ;
+  color: #dddddd;
 }
  
 .drop-down-menu-container > ul {
