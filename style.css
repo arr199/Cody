@@ -14,6 +14,7 @@ body{
   background: #242424;
   height: 100vh;
   border: none;
+  overflow: hidden;
 
   font-family: 'Oswald', sans-serif;
 }
@@ -72,6 +73,7 @@ main{
   height: 100%;
   display: flex;
   flex-direction: column;
+ 
 }
 /* ////////  MAIN CONTENT ///////// */
 
@@ -213,7 +215,11 @@ iframe{
   word-spacing: 2px;
   letter-spacing: 1px;
   overflow-x: auto;
+  overflow-y: scroll;
   min-width: 100%;
+  max-height: 100%;
+  
+
   
 }
 
@@ -303,7 +309,7 @@ iframe{
   grid-template:  50% 50%  / 40% 40% 20%;
   grid-template-areas:  " html css console "
                         " js iframe console" ;
-  height: 100%;
+  height: 90%;
   width: 100%;
   margin: 0;
   padding: 0;
