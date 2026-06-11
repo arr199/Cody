@@ -27,6 +27,9 @@ const frontEndButton = document.querySelector('#frontend-view-button')
 const playgroundButton = document.querySelector('#playground-view-button')
 
 function init () {
+  // APPLY THE SAVED THEME TO THE EDITORS + APP
+  applyTheme(localStorage.getItem('cody-editor-theme') || 'vs-dark')
+
   // GETTING THE URL AND SPLITTING THE URL BASE64 PART BY "|" WHICH IS "%7C" IN URL ENCODE
   const url = window.location.href.split('/')[3]
   const rawHtml = url.split('%7C')[0]
@@ -75,6 +78,24 @@ cssEditor.onDidChangeModelContent(e => {
 })
 // GETTING THE EDITOR MARKERS (ERRORS) //
 getErrors()
+
+// THEME //
+// The Monaco theme is the single source of truth: a light editor theme
+// (vs / hc-light) puts the whole app in light mode, a dark one (vs-dark /
+// hc-black) puts it in dark mode. The choice is persisted across reloads
+// (see the inline script in index.html that applies it before paint).
+function isLightTheme (name) {
+  return name === 'vs' || name === 'hc-light'
+}
+
+function applyTheme (editorTheme) {
+  document.documentElement.setAttribute('data-theme', isLightTheme(editorTheme) ? 'light' : 'dark')
+  localStorage.setItem('cody-editor-theme', editorTheme)
+
+  htmlEditor.updateOptions({ theme: editorTheme })
+  cssEditor.updateOptions({ theme: editorTheme })
+  jsEditor.updateOptions({ theme: editorTheme })
+}
 
 /// //// EVENT LISTENERS //////
 
@@ -166,9 +187,7 @@ document.addEventListener('click', (e) => {
     fontSizeMenu.remove()
   }
   if (e.target.dataset.id === 'theme') {
-    htmlEditor.updateOptions({ theme: e.target.innerText })
-    cssEditor.updateOptions({ theme: e.target.innerText })
-    jsEditor.updateOptions({ theme: e.target.innerText })
+    applyTheme(e.target.dataset.theme)
     themeMenu.remove()
   }
 

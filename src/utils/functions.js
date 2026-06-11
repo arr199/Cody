@@ -4,10 +4,11 @@ export function removeActiveClasses () {
     menu.classList.remove('buttons-active')
   })
 }
-//  GET COLOR FOR CONSOLE LOG //
+//  GET COLOR FOR CONSOLE LOG (theme-aware) //
 export function getLogColor (type) {
-  if (type === 'error') return 'rgb(255, 105, 105)'
-  return 'rgb(57, 211, 134)'
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light'
+  if (type === 'error') return isLight ? '#dc2626' : 'rgb(255, 105, 105)'
+  return isLight ? '#047857' : 'rgb(57, 211, 134)'
 }
 
 export function getLogClass (type) {

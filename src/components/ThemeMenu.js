@@ -3,11 +3,12 @@ export function ThemeMenu () {
            ` 
             <div id="theme-menu" class="drop-down-menu-container">
                 <ul className="dropdown-menu" aria-labelledby="theme-menu">
-                    <li data-id="theme" >vs-dark</li>
-                    <li data-id="theme" >hc-black</li>
-                    <li data-id="theme" >hc-light</li>
+                    <li data-id="theme" data-theme="vs-dark" >Dark</li>
+                    <li data-id="theme" data-theme="vs" >Light</li>
+                    <li data-id="theme" data-theme="hc-black" >High Contrast Dark</li>
+                    <li data-id="theme" data-theme="hc-light" >High Contrast Light</li>
                 </ul>
-            </div> 
+            </div>
             `
   )
 }
