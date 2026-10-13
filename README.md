@@ -15,6 +15,19 @@ A playground to test your JavaScript, CSS, and HTML skills.
 - **Dual Viewing Modes** - Switch between the frontend view (to see your website) and the playground view (for JavaScript editing and console), allowing you to focus on what matters most at any given moment.
 - **URL Sharing**  - A single click allows you to copy the URL, making it simple to showcase your work to colleagues or friends.
 
+> **Note:** The preview runs in a sandboxed iframe, so code from a shared link can't reach the app or your data. As a result, `localStorage`, `sessionStorage` and cookies aren't available to code in the preview.
+
+## Development
+
+```sh
+pnpm install
+pnpm dev        # start the dev server
+pnpm build      # production build into dist/
+pnpm lint       # ESLint
+pnpm test       # unit tests (Vitest)
+pnpm test:e2e   # browser tests (Playwright, uses your installed Google Chrome)
+```
+
 ## Built With 
   
 - [JavaScript](https://www.javascript.com/) - The language that powers the World Wide Web.

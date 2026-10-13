@@ -1,213 +1,91 @@
-/* eslint-disable no-new-func */
-/* eslint-disable brace-style */
-import { encode, decode } from 'js-base64'
-import { htmlEditor, cssEditor, jsEditor, createHtml } from './src/monaco/editors'
-// COMPONENTS
-import { FontSizeMenu } from './src/components/FontSizeMenu'
-import { ThemeMenu } from './src/components/ThemeMenu'
+import { monaco, createEditors, readCode, setFontSize } from './src/editors'
+import { encodeState, decodeState } from './src/state/urlCodec'
+import { buildDocument } from './src/preview/buildDocument'
+import { onConsoleMessage } from './src/preview/consoleBridge'
+import { createConsolePanel } from './src/console/consolePanel'
+import { loadPreferences, applyTheme, saveFontSize } from './src/ui/preferences'
+import { createMenu, closeMenusOnOutsideInteraction } from './src/ui/menus'
+import { setupViews } from './src/ui/views'
+import { setupCopyUrl } from './src/ui/copyUrl'
+import { debounce } from './src/utils/debounce'
 
-import { removeActiveClasses } from './src/utils/functions'
-import { API } from './src/utils/API'
-import { getErrors } from './src/monaco/getErrors'
-import { getConsoleLogs } from './src/monaco/getConsoleLogs'
+// Every preview render re-runs the user's JS, so JS edits wait longer
+// before re-rendering than HTML and CSS edits.
+const RENDER_DELAY = { html: 500, css: 500, js: 1500 }
+const ERRORS_DELAY = 1500
 
-// FONT-SIZE ICON AND SELECT MENU
-const fontSizeButtonContainer = document.querySelector('#font-size-button-container')
-const fontSizeButton = document.querySelector('#font-size-button')
-// THEME
-const themeMenuButton = document.querySelector('#theme-button')
-const themeButtonContainer = document.querySelector('#theme-button-container')
-// COPY URL
-const copyUrlBtn = document.querySelector('#copy-url-button')
-const urlCopyContainer = document.querySelector('#url-copy-container')
+function bootstrap () {
+  const $ = (selector) => document.querySelector(selector)
+  const page = $('#page')
 
-const page = document.querySelector('#page')
-// TOP NAVBAR BUTTONS
-const frontEndButton = document.querySelector('#frontend-view-button')
-const playgroundButton = document.querySelector('#playground-view-button')
+  const preferences = loadPreferences()
+  const editors = createEditors(
+    { html: $('#html-editor'), css: $('#css-editor'), js: $('#js-editor') },
+    preferences
+  )
+  applyTheme(preferences.theme)
 
-function init () {
-  // APPLY THE SAVED THEME TO THE EDITORS + APP
-  applyTheme(localStorage.getItem('cody-editor-theme') || 'vs-dark')
+  // CONSOLE
+  const consolePanel = createConsolePanel($('#console'))
+  onConsoleMessage(page, (type, args) => consolePanel.appendLog(type, args))
+  monaco.editor.onDidChangeMarkers(debounce(() => {
+    consolePanel.setErrors(monaco.editor.getModelMarkers({}))
+  }, ERRORS_DELAY))
 
-  // GETTING THE URL AND SPLITTING THE URL BASE64 PART BY "|" WHICH IS "%7C" IN URL ENCODE
-  const url = window.location.href.split('/')[3]
-  const rawHtml = url.split('%7C')[0]
-  const rawJs = url.split('%7C')[1]
-  const rawCss = url.split('%7C')[2]
-
-  // SETTING THE VALUES OF OUR EDITORS TO THE URL CODE , NOW DECODED
-  if (rawHtml) {
-    htmlEditor.setValue(decode(rawHtml))
+  // PREVIEW + SHARE URL
+  function update () {
+    const code = readCode(editors)
+    consolePanel.clearLogs()
+    page.srcdoc = buildDocument(code)
+    // Always written from the app root, which also moves legacy path-based
+    // links over to the hash format.
+    const state = encodeState(code)
+    history.replaceState(null, '', import.meta.env.BASE_URL + (state ? `#${state}` : ''))
   }
-  if (rawJs) {
-    jsEditor.setValue(decode(rawJs))
+
+  let renderTimer
+  let loading = false
+
+  // setValue fires change events synchronously; `loading` keeps them from
+  // scheduling extra renders on top of the immediate one.
+  function loadCode (code) {
+    loading = true
+    editors.html.setValue(code.html)
+    editors.css.setValue(code.css)
+    editors.js.setValue(code.js)
+    loading = false
+    clearTimeout(renderTimer)
+    update()
   }
-  if (rawCss) {
-    cssEditor.setValue(decode(rawCss))
-  }
-}
 
-// ADDING DEBOUNCING FOR OUR 3 EDITORS AND ALSO ENCODING THE TEXT IN BASE64 AND PASSING IT TO THE URL//
-let renderHtml
-htmlEditor.onDidChangeModelContent(e => {
-  clearTimeout(renderHtml)
-  renderHtml = setTimeout(() => { // WE ADD "|"  BETWEEN EVERY EDITOR CODE IN ORDER TO KNOW LATER//
-    page.setAttribute('srcdoc', createHtml()) // WHICH PART OF THE URL REPRESENT OUR EXACT EDITOR //
-    history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-  }, 500)
-})
-
-let renderJs
-jsEditor.onDidChangeModelContent(e => {
-  clearTimeout(renderJs)
-  renderJs = setTimeout(() => {
-    page.setAttribute('srcdoc', createHtml())
-    history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-    getConsoleLogs()
-  }, 1500)
-})
-
-let renderCss
-cssEditor.onDidChangeModelContent(e => {
-  clearTimeout(renderCss)
-  renderCss = setTimeout(function () {
-    page.setAttribute('srcdoc', createHtml())
-    history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-  }, 500)
-})
-// GETTING THE EDITOR MARKERS (ERRORS) //
-getErrors()
-
-// THEME //
-// The Monaco theme is the single source of truth: a light editor theme
-// (vs / hc-light) puts the whole app in light mode, a dark one (vs-dark /
-// hc-black) puts it in dark mode. The choice is persisted across reloads
-// (see the inline script in index.html that applies it before paint).
-function isLightTheme (name) {
-  return name === 'vs' || name === 'hc-light'
-}
-
-function applyTheme (editorTheme) {
-  document.documentElement.setAttribute('data-theme', isLightTheme(editorTheme) ? 'light' : 'dark')
-  localStorage.setItem('cody-editor-theme', editorTheme)
-
-  htmlEditor.updateOptions({ theme: editorTheme })
-  cssEditor.updateOptions({ theme: editorTheme })
-  jsEditor.updateOptions({ theme: editorTheme })
-}
-
-/// //// EVENT LISTENERS //////
-
-// FRONTEND VIEW BUTTON //
-frontEndButton.addEventListener('click', () => {
-  const editorsEl = Array.from(document.querySelectorAll('.editors'))
-  const editorsContainer = document.querySelector('#editors-container')
-
-  editorsEl.forEach(editor => {
-    editor.style.display = 'block'
-  })
-  editorsContainer.classList.remove('playground-view')
-  editorsContainer.classList.add('front-end-view')
-})
-
-// PLAYGROUND VIEW BUTTON //
-playgroundButton.addEventListener('click', () => {
-  const editorsEl = Array.from(document.querySelectorAll('.editors'))
-  const editorsContainer = document.querySelector('#editors-container')
-
-  editorsEl.forEach(editor => {
-    if (editor.id !== 'console' && editor.id !== 'js-editor') {
-      editor.style.display = 'none'
-    }
-  })
-  editorsContainer.classList.remove('front-end-view')
-  editorsContainer.classList.add('playground-view')
-})
-
-// FONT SIZE BUTTON //
-fontSizeButton.addEventListener('click', (e) => {
-  e.target.classList.toggle('buttons-active')
-  const fontSizeMenu = document.querySelector('#font-size-menu')
-
-  if (fontSizeMenu !== null) {
-    fontSizeMenu.remove()
-  }
-  else {
-    fontSizeButtonContainer.insertAdjacentHTML('beforeend', FontSizeMenu())
-  }
-  e.stopPropagation()
-})
-
-// THEME BUTTON //
-themeMenuButton.addEventListener('click', (e) => {
-  e.target.classList.toggle('buttons-active')
-  const themeMenu = document.querySelector('#theme-menu')
-  if (themeMenu !== null) {
-    themeMenu.remove()
-  }
-  else {
-    themeButtonContainer.insertAdjacentHTML('beforeend', ThemeMenu())
-  }
-  e.stopPropagation()
-})
-
-// COPY URL BUTTON //
-let disableTimer
-copyUrlBtn.addEventListener('click', () => {
-  clearTimeout(disableTimer)
-
-  urlCopyContainer.style.display = 'grid'
-  disableTimer = setTimeout(() => {
-    urlCopyContainer.style.display = 'none'
-
-    const urlContent = window.location.href
-    // SENDING OUR URL TO THE BACKEND AND GETTING THE SHORTENED VERSION OF IT //
-    fetch(API.LINK_SHORTENER_URL, {
-      method: 'POST',
-      body: JSON.stringify({ content: urlContent }),
-      headers: { 'Content-Type': 'application/json' }
+  for (const language of ['html', 'css', 'js']) {
+    editors[language].onDidChangeModelContent(() => {
+      if (loading) return
+      clearTimeout(renderTimer)
+      renderTimer = setTimeout(update, RENDER_DELAY[language])
     })
-      .then(res => res.json())
-      .then(data => {
-        navigator.clipboard.writeText(data.link)
-      })
-  }, 1000)
-})
-
-//  DROP DOWN MENU EVENT LISTENERS //
-document.addEventListener('click', (e) => {
-  const fontSizeMenu = document.querySelector('#font-size-menu')
-  const themeMenu = document.querySelector('#theme-menu')
-
-  if (e.target.dataset.id === 'font-size') {
-    htmlEditor.updateOptions({ fontSize: e.target.innerText })
-    cssEditor.updateOptions({ fontSize: e.target.innerText })
-    jsEditor.updateOptions({ fontSize: e.target.innerText })
-    fontSizeMenu.remove()
-  }
-  if (e.target.dataset.id === 'theme') {
-    applyTheme(e.target.dataset.theme)
-    themeMenu.remove()
   }
 
-  removeActiveClasses()
-})
+  loadCode(decodeState(window.location))
+  // Opening another share link in the same tab only changes the hash, which
+  // doesn't reload the page. (replaceState in update() doesn't fire this.)
+  window.addEventListener('hashchange', () => loadCode(decodeState(window.location)))
 
-// CLOSE THE DROP-DOWN MENU WHEN WE CLICK OUTSIDE OF IT //
-document.addEventListener('mousedown', (e) => {
-  const themeMenu = document.querySelector('#theme-menu')
-  const fontSizeMenu = document.querySelector('#font-size-menu')
+  // TOOLBAR
+  const fontSizeMenu = createMenu($('#font-size-button'), $('#font-size-menu'), (value) => {
+    const fontSize = Number(value)
+    setFontSize(editors, fontSize)
+    saveFontSize(fontSize)
+  })
+  const themeMenu = createMenu($('#theme-button'), $('#theme-menu'), applyTheme)
+  closeMenusOnOutsideInteraction([fontSizeMenu, themeMenu])
 
-  const target = e.target
-  if (themeMenu !== null && themeMenu.contains(target) === false && target !== themeMenuButton) {
-    themeMenu.remove()
-    removeActiveClasses()
-  }
-  if (fontSizeMenu !== null && fontSizeMenu.contains(target) === false && target !== fontSizeButton) {
-    fontSizeMenu.remove()
-    removeActiveClasses()
-  }
-})
+  setupCopyUrl($('#copy-url-button'), $('#url-copy-container'))
 
-init()
+  setupViews($('#editors-container'), {
+    'front-end-view': $('#frontend-view-button'),
+    'playground-view': $('#playground-view-button')
+  })
+}
+
+bootstrap()
