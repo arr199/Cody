@@ -28,6 +28,8 @@
   --log-ok-bg: rgba(52, 211, 153, 0.12);
   --log-err: #f87171;
   --log-err-bg: rgba(248, 113, 113, 0.12);
+  --log-warn: #fbbf24;
+  --log-warn-bg: rgba(251, 191, 36, 0.12);
 
   /* misc */
   --radius: 10px;
@@ -64,6 +66,8 @@
   --log-ok-bg: rgba(4, 120, 87, 0.1);
   --log-err: #dc2626;
   --log-err-bg: rgba(220, 38, 38, 0.1);
+  --log-warn: #b45309;
+  --log-warn-bg: rgba(180, 83, 9, 0.1);
 }
 
 /* ============================================================
@@ -199,6 +203,7 @@ header {
   width: 100%;
   display: flex;
   flex-direction: column;
+  gap: 2px;
   padding: 6px;
   font-size: 14px;
   border-radius: var(--radius-sm);
@@ -206,22 +211,23 @@ header {
   color: var(--text);
 }
 
-.drop-down-menu-container > ul {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.drop-down-menu-container[hidden] {
+  display: none;
 }
 
-.drop-down-menu-container > ul > li {
+.drop-down-menu-container > button {
   padding: 7px 10px;
+  border: none;
   border-radius: 5px;
+  background: none;
+  color: inherit;
+  font-size: inherit;
   cursor: pointer;
   text-align: left;
   transition: background 0.12s var(--ease), color 0.12s var(--ease);
 }
 
-.drop-down-menu-container > ul > li:hover {
+.drop-down-menu-container > button:hover {
   background: var(--accent-soft);
   color: var(--accent-hover);
   font-weight: 700;
@@ -312,6 +318,11 @@ main {
   background: var(--bg);
 }
 
+/* the playground view only shows the JS editor and the console */
+.playground-view > .editors:not(#js-editor, #console) {
+  display: none;
+}
+
 #html-editor { grid-area: html; }
 #js-editor { grid-area: js; }
 #css-editor { grid-area: css; }
@@ -364,7 +375,13 @@ iframe.editors,
   overflow-y: auto;
 }
 
+/* errors and logs are separate regions that still flow as one list */
+.console-region {
+  display: contents;
+}
+
 .error,
+.warn,
 .string-log {
   display: flex;
   align-items: center;
@@ -382,23 +399,24 @@ iframe.editors,
   border-left-color: var(--log-err);
 }
 
+.warn {
+  color: var(--log-warn);
+  background: var(--log-warn-bg);
+  border-left-color: var(--log-warn);
+}
+
 .string-log {
   color: var(--log-ok);
   background: var(--log-ok-bg);
   border-left-color: var(--log-ok);
 }
 
-.error svg { fill: var(--log-err); }
-.string-log svg { fill: var(--log-ok); }
 .error svg,
+.warn svg,
 .string-log svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-}
-
-.logsvg-span {
-  display: flex;
 }
 
 /* ============================================================
@@ -421,12 +439,13 @@ iframe.editors,
   animation: append-animate 0.18s var(--ease);
 }
 
+.url-copy-container.visible {
+  display: grid;
+}
+
 /* ============================================================
    Utilities + animations
    ============================================================ */
-.hide-editor { display: none; }
-.show-editor { display: block; }
-
 @keyframes append-animate {
   from {
     transform: scale(0.96);

@@ -3,21 +3,22 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="apple-touch-icon" sizes="180x180" href="images/favicon_io/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="images/favicon_io/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="images/favicon_io/favicon-16x16.png">
-  <link rel="manifest" href="images/favicon_io/site.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon_io/favicon-16x16.png">
+  <link rel="manifest" href="/images/favicon_io/site.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/style.css">
   <!-- FONT -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,700&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
   <title>Cody-Studio</title>
-  <!-- Apply saved theme before paint to avoid a flash -->
+  <!-- Apply saved theme before paint to avoid a flash. Keep in sync with src/ui/preferences.js -->
   <script>
     (function () {
-      var t = localStorage.getItem('cody-editor-theme') || 'vs-dark'
+      var t = 'vs-dark'
+      try { t = localStorage.getItem('cody-editor-theme') || t } catch (e) {}
       var app = (t === 'vs' || t === 'hc-light') ? 'light' : 'dark'
       document.documentElement.setAttribute('data-theme', app)
     })()
@@ -39,24 +40,39 @@
 
       <!-- FONT SIZE -->
       <div id="font-size-button-container" class="btn-containers">
-        <button id="font-size-button" class="left-navbar-buttons">
+        <button id="font-size-button" class="left-navbar-buttons" aria-expanded="false" aria-controls="font-size-menu">
           <svg xmlns="http://www.w3.org/2000/svg" height="24" fill="currentcolor" viewBox="0 -960 960 960" width="24"><path d="M560-160v-520H360v-120h520v120H680v520H560Zm-360 0v-320H80v-120h360v120H320v320H200Z"/></svg>
           Font-Size
         </button>
+        <div id="font-size-menu" class="drop-down-menu-container" hidden>
+          <button type="button" data-value="14">14 px</button>
+          <button type="button" data-value="15">15 px</button>
+          <button type="button" data-value="16">16 px</button>
+          <button type="button" data-value="17">17 px</button>
+          <button type="button" data-value="18">18 px</button>
+          <button type="button" data-value="19">19 px</button>
+          <button type="button" data-value="20">20 px</button>
+        </div>
       </div>
       <!-- THEME -->
       <div id="theme-button-container" class="btn-containers">
-        <button id="theme-button" class="left-navbar-buttons ">
+        <button id="theme-button" class="left-navbar-buttons" aria-expanded="false" aria-controls="theme-menu">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-palette" viewBox="0 0 16 16">
             <path d="M8 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm4 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5.5 7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm.5 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
             <path d="M16 8c0 3.15-1.866 2.585-3.567 2.07C11.42 9.763 10.465 9.473 10 10c-.603.683-.475 1.819-.351 2.92C9.826 14.495 9.996 16 8 16a8 8 0 1 1 8-8zm-8 7c.611 0 .654-.171.655-.176.078-.146.124-.464.07-1.119-.014-.168-.037-.37-.061-.591-.052-.464-.112-1.005-.118-1.462-.01-.707.083-1.61.704-2.314.369-.417.845-.578 1.272-.618.404-.038.812.026 1.16.104.343.077.702.186 1.025.284l.028.008c.346.105.658.199.953.266.653.148.904.083.991.024C14.717 9.38 15 9.161 15 8a7 7 0 1 0-7 7z"/>
           </svg>
           Theme
         </button>
+        <div id="theme-menu" class="drop-down-menu-container" hidden>
+          <button type="button" data-value="vs-dark">Dark</button>
+          <button type="button" data-value="vs">Light</button>
+          <button type="button" data-value="hc-black">High Contrast Dark</button>
+          <button type="button" data-value="hc-light">High Contrast Light</button>
+        </div>
       </div>
       <!-- COPY URL -->
       <div id="copy-url-button-container" class="btn-containers">
-        <button id="copy-url-button" class="left-navbar-buttons" for="copy-url">
+        <button id="copy-url-button" class="left-navbar-buttons">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-copy" viewBox="0 0 16 16">
             <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2Zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6ZM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2Z"/>
           </svg>
@@ -83,30 +99,31 @@
      <div id="editors-container" class="front-end-view">
         
       <div  id="html-editor" class="editors">
-          <img alt="html icon" class="icons" src="images/html (1).png">
+          <img alt="html icon" class="icons" src="/images/html.png">
         </div>
     
         <div id="css-editor" class="editors">
-          <img alt="css icon" class="icons" src="images/css.png">
+          <img alt="css icon" class="icons" src="/images/css.png">
         </div>
     
         <div id="js-editor" class="editors">
-          <img alt="javascript icon" class="icons" src="images/js.png">
+          <img alt="javascript icon" class="icons" src="/images/js.png">
         </div>
         <!--  PREVIEW SCREEN -->
-        <iframe title="Website Preview" class="editors" id="page" srcdoc="" frameborder="2"></iframe>
+        <!-- Sandboxed without allow-same-origin: shared links run third-party code -->
+        <iframe title="Website Preview" class="editors" id="page" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
         <!-- CONSOLE -->
         <div id="console" class="console editors">
         </div>
    
     </div>
     <!-- COPY URL POP UP -->
-    <div id="url-copy-container" class="url-copy-container">
+    <div id="url-copy-container" class="url-copy-container" role="status" aria-live="polite">
       <span>URL Copied to Clipboard</span>
   </div>
   </main>
 
-  <script type="module" src="main.js">
+  <script type="module" src="/main.js">
   </script>
 </body>
 
