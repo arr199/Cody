@@ -4,8 +4,13 @@ import { encode, decode } from 'js-base64'
 // Keep this order: links already saved in the shortener depend on it.
 const SEPARATOR = '|'
 
-export function encodeState ({ html, js, css }) {
-  if (!html && !js && !css) return ''
+export function hasCode ({ html, js, css }) {
+  return Boolean(html || js || css)
+}
+
+export function encodeState (code) {
+  if (!hasCode(code)) return ''
+  const { html, js, css } = code
   return [html, js, css].map(part => encode(part, true)).join(SEPARATOR)
 }
 

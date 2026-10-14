@@ -21,6 +21,7 @@ Cody is a browser-based HTML/CSS/JS playground. It's vanilla JavaScript built wi
 - Import Monaco from `src/editors.js`, never directly from `'monaco-editor'`, so the bundle only includes the HTML/CSS/JS languages.
 - Keep changes scoped to the task. Don't add features or upgrade dependencies unless asked.
 - Match the existing style: ESLint `neostandard` (no semicolons, 2-space indent, space before function parens).
+- Design work uses the `impeccable` skill. Product truth lives in `PRODUCT.md`, the app's design system in `DESIGN.md` (tokens in `.impeccable/design.json`), and per-surface design contracts in `.impeccable/surfaces/`. Read them before changing UI or examples, and offer the user design variants to choose from before building.
 
 ## Testing
 
@@ -48,14 +49,23 @@ Run `pnpm lint`, `pnpm test` and `pnpm test:e2e` (which also builds) before repo
 
 ## Layout
 
-- `index.html`: app shell, plus an inline script that applies the saved theme before paint.
+- `index.html`: app shell (the rail, the `#workspace` grid with the editor, preview and console panes, and the phone tab bar), plus an inline script that applies the saved theme before paint.
 - `main.js`: `bootstrap()` wires the modules together. It holds no feature logic of its own.
 - `style.css`: all styles. Theme tokens are on `:root`, with light-mode overrides under `[data-theme="light"]`.
 - `src/editors.js`: Monaco setup (slim ESM imports, workers, Emmet) and editor helpers. The only place that imports `monaco-editor`.
 - `src/state/urlCodec.js`: pure encode/decode of the editors' code to and from share URLs, including legacy path links.
 - `src/preview/buildDocument.js`: builds the preview's HTML document.
+- `src/preview/previewFrame.js`: swaps in a fresh iframe on every render. Setting `srcdoc` on the same iframe would add a browser history entry each time and break the Back button.
 - `src/preview/consoleBridge.js`: the script injected into the preview (console forwarding plus a safe serializer), and the app-side message listener.
+- `src/preview/deviceToolbar.js`: the preview's width presets, free-drag frame width with a px readout, and fullscreen.
+- `src/preview/openInTab.js`, `preview.html` and `src/preview/standalone.js`: Open in new tab renders the code from the URL hash in the same sandbox as the app's preview.
+- `vite.config.js`: declares both pages (`index.html`, `preview.html`) for the build.
 - `src/console/consolePanel.js`: the only module that writes to `#console`. Errors and logs live in separate regions.
-- `src/ui/`: toolbar behavior. `menus.js` (dropdowns), `views.js` (layout switch), `preferences.js` (theme and font size, persisted in localStorage), `copyUrl.js` (shortened share link).
+- `src/examples/`: starter examples. Each folder holds real `markup.html`, `style.css` and `script.js` files, imported as text with `?raw`. `index.js` lists them (`EXAMPLES`, `DEFAULT_EXAMPLE_ID`). A link with no code opens the default example, and loading one pushes a history entry so Back restores the previous code.
+- `src/ui/`: the shell's behaviour.
+  - `workspace.js`: the one owner of which editor and which panel are showing (`data-language` / `data-panel` on `#workspace`).
+  - `tabs.js`: the desktop editor tabs and the phone tab bar (WAI-ARIA tablists), plus the error dots.
+  - `splitter.js` and `layout.js`: the resizable editor/preview split and console drawer, with sizes kept in localStorage.
+  - `menus.js` (dropdowns), `examplesMenu.js` (the Examples menu with its live preview), `preferences.js` (theme and font size), `copyUrl.js` (shortened share link), `toast.js` (the shared status message).
 - `src/utils/`: API constants, `debounce`, and static icons.
 - `test/`: see Testing above.

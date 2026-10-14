@@ -20,6 +20,8 @@
   --accent-hover: #818cf8;
   --accent-contrast: #ffffff;
   --accent-soft: rgba(99, 102, 241, 0.16);
+  /* Deep Indigo: filled surfaces carrying white text (clears 4.5:1 in both themes) */
+  --accent-deep: color-mix(in srgb, var(--accent) 82%, #000);
 
   /* console */
   --console-bg: #0b0d13;
@@ -82,6 +84,7 @@
 body {
   display: flex;
   height: 100vh;
+  height: 100dvh; /* mobile browsers: exclude the retractable toolbar */
   overflow: hidden;
   font-size: 16px;
   font-family: var(--ui-font);
@@ -233,116 +236,417 @@ header {
   font-weight: 700;
 }
 
-/* ============================================================
-   Main + top navbar
-   ============================================================ */
-main {
-  width: 100%;
-  height: 100%;
+/* examples menu: the list on the left, a live preview of the hovered
+   example on the right */
+.examples-menu {
+  width: min(600px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: 220px 1fr;
+}
+
+.example-list {
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  gap: 2px;
 }
 
-.top-navbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  width: 100%;
-  height: 64px;
+.example-option {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 20px;
-  gap: 8px;
-}
-
-.top-navbar-buttons {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-weight: 700;
-  font-size: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: background 0.15s var(--ease), color 0.15s var(--ease),
-    border-color 0.15s var(--ease), transform 0.05s var(--ease);
-  display: flex;
-  align-items: center;
-  padding: 10px 22px;
-  white-space: nowrap;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+
+.example-option:hover,
+.example-option:focus-visible,
+.example-option[aria-current='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.example-title {
+  font-weight: 700;
+}
+
+.example-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.example-option:hover .example-meta,
+.example-option:focus-visible .example-meta,
+.example-option[aria-current='true'] .example-meta {
+  color: inherit;
+}
+
+.example-detail {
+  display: grid;
+  align-content: start;
   gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-left: 1px solid var(--border);
 }
 
-.top-navbar-buttons:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
-  color: var(--text);
+/* The example renders at twice this size (about the real preview pane),
+   then scales down to fit */
+.example-detail-preview {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
 }
 
-.top-navbar-buttons:active {
-  transform: translateY(1px);
+.example-detail-preview iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  border: 0;
+  background: #fff;
+  transform: scale(0.5);
+  transform-origin: 0 0;
+  pointer-events: none;
 }
 
-.top-navbar-buttons.buttons-active {
+.example-detail-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.example-detail-text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Darker than the accent so white text clears 4.5:1 */
+.example-load {
+  justify-self: start;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent-deep);
   color: var(--accent-contrast);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.example-load:hover {
   background: var(--accent);
-  border-color: var(--accent);
+}
+
+@media (max-width: 700px) {
+  .examples-menu {
+    width: 264px;
+    grid-template-columns: 1fr;
+  }
+
+  .example-detail {
+    display: none;
+  }
 }
 
 /* ============================================================
-   Editors grid + panels
+   Workspace: tabbed editor, preview, console drawer
    ============================================================ */
-.front-end-view {
-  display: grid;
-  grid-template: 50% 50% / 40% 40% 20%;
-  grid-template-areas:
-    "html css console"
-    "js iframe console";
-  gap: 10px;
-  height: 90%;
-  width: 100%;
-  padding: 12px;
-  background: var(--bg);
-}
-
-.playground-view {
-  display: grid;
-  grid-template: 1fr 1fr / 70% 30%;
-  grid-template-areas:
-    "js console"
-    "js console";
-  gap: 10px;
+.workspace {
+  --split: 50%;
+  --console: 160px;
+  flex: 1;
+  min-width: 0;
   height: 100%;
-  max-width: 100%;
+  display: grid;
+  grid-template-columns: minmax(280px, var(--split)) 12px minmax(240px, 1fr);
+  grid-template-rows: minmax(0, 1fr) 12px var(--console);
+  grid-template-areas:
+    "editor split preview"
+    "drawer drawer drawer"
+    "console console console";
+  gap: 0;
   padding: 12px;
   background: var(--bg);
 }
 
-/* the playground view only shows the JS editor and the console */
-.playground-view > .editors:not(#js-editor, #console) {
-  display: none;
-}
-
-#html-editor { grid-area: html; }
-#js-editor { grid-area: js; }
-#css-editor { grid-area: css; }
-#page { grid-area: iframe; }
-.console { grid-area: console; }
-
-.editors {
+.pane {
   position: relative;
-  width: 100%;
-  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
   background: var(--surface);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-iframe.editors,
+.editor-pane {
+  grid-area: editor;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-pane {
+  grid-area: preview;
+  display: flex;
+  flex-direction: column;
+}
+
+.console {
+  grid-area: console;
+}
+
+.handle {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  touch-action: none;
+}
+
+.handle::after {
+  content: '';
+  border-radius: 2px;
+  background: var(--border-strong);
+  transition: background 0.15s var(--ease);
+}
+
+.handle:hover::after,
+.handle:focus-visible::after,
+.handle.is-dragging::after {
+  background: var(--accent);
+}
+
+.handle-split {
+  grid-area: split;
+  cursor: col-resize;
+}
+
+.handle-split::after {
+  width: 2px;
+  height: 40px;
+}
+
+.handle-console {
+  grid-area: drawer;
+  cursor: row-resize;
+}
+
+.handle-console::after {
+  width: 40px;
+  height: 2px;
+}
+
+/* While a handle is dragged, iframes must not swallow the pointer */
+.is-resizing iframe {
+  pointer-events: none;
+}
+
+.editor-tabs {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.editor-tabs [role='tab'] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.editor-tabs [role='tab']:hover {
+  color: var(--text);
+}
+
+.editor-tabs [role='tab'][aria-selected='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.error-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--log-err);
+}
+
+.error-dot[hidden] {
+  display: none;
+}
+
+/* Only the selected language's editor shows; the other two stay mounted */
+.editor {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: none;
+}
+
+.workspace[data-language='html'] #html-editor,
+.workspace[data-language='css'] #css-editor,
+.workspace[data-language='js'] #js-editor {
+  display: block;
+}
+
+.preview-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+}
+
+.preview-frame {
+  position: relative;
+  width: var(--frame-width, 100%);
+  max-width: 100%;
+  height: 100%;
+}
+
 #page {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
   background: #ffffff;
+}
+
+/* On a narrow pane the toolbar wraps to a second row; no control is clipped */
+.device-toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.device-presets,
+.frame-readout,
+.preview-action {
+  flex: none;
+  white-space: nowrap;
+}
+
+.device-presets {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.device-presets button,
+.preview-action {
+  padding: 4px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.device-presets button:hover,
+.preview-action:hover {
+  color: var(--text);
+}
+
+.device-presets button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* The preset is wider than the pane: still chosen, but visibly not met */
+.device-presets button[data-clamped] {
+  background: none;
+  box-shadow: inset 0 -2px 0 var(--text-muted);
+}
+
+.preview-action {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.frame-readout {
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* Free-drag handle on the frame's right edge; the frame stays centred */
+.handle-frame {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.handle-frame::after {
+  width: 2px;
+  height: 40px;
+}
+
+.preview-pane:fullscreen {
+  border-radius: 0;
+}
+
+/* A sized frame shows its edge, even when the page inside is white */
+.preview-frame[data-sized] {
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+/* A frame as wide as the stage would push its handle off the pane's
+   clipped edge; keep it inside, where it can be grabbed */
+.preview-frame[data-fills] .handle-frame {
+  right: 0;
+}
+
+/* Inside the frame the grip would sit on the user's page; show it only when needed */
+.preview-frame[data-fills] .handle-frame::after {
+  opacity: 0;
+}
+
+.preview-frame[data-fills] .handle-frame:is(:hover, :focus-visible, .is-dragging)::after {
+  opacity: 1;
+}
+
+/* An empty console says what it is for */
+.console:not(:has(.error, .warn, .string-log))::before {
+  content: 'Console output appears here';
+  padding: 4px 6px;
+  color: var(--text-muted);
+  font: 700 12px var(--ui-font);
 }
 
 /* faded language-logo watermark behind each editor */
@@ -429,7 +733,7 @@ iframe.editors,
   margin: auto;
   width: 240px;
   height: 48px;
-  background: var(--accent);
+  background: var(--accent-deep);
   color: var(--accent-contrast);
   font-weight: 700;
   border-radius: var(--radius);
@@ -454,5 +758,162 @@ iframe.editors,
   to {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+/* ============================================================
+   Phones: one panel at a time, picked from the tab bar
+   ============================================================ */
+.mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  body {
+    flex-direction: column;
+  }
+
+  header {
+    height: auto;
+  }
+
+  .left-navbar {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .config-icon {
+    width: auto;
+    height: 40px;
+    margin: 0 auto 0 0;
+    border-bottom: 0;
+  }
+
+  .btn-containers {
+    width: auto;
+    position: static;
+  }
+
+  /* Square icon buttons, every icon the same size */
+  .left-navbar-buttons {
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .left-navbar-buttons svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Icons only; the label stays as the accessible name */
+  .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Menus open full-width under the top bar, always on screen */
+  .drop-down-menu-container {
+    position: fixed;
+    top: 60px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+
+  /* Below the top bar, the workspace takes the rest of the screen */
+  .workspace {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "panel"
+      "tabs";
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .editor-pane,
+  .preview-pane,
+  .console {
+    grid-area: panel;
+  }
+
+  .workspace[data-panel='editor'] :is(.preview-pane, .console),
+  .workspace[data-panel='preview'] :is(.editor-pane, .console),
+  .workspace[data-panel='console'] :is(.editor-pane, .preview-pane),
+  .handle,
+  .editor-tabs,
+  .device-presets,
+  .frame-readout {
+    display: none;
+  }
+
+  .preview-frame {
+    width: 100%;
+  }
+
+  /* Console lines flow as one wrapping paragraph instead of scrolling sideways */
+  .error,
+  .warn,
+  .string-log {
+    display: block;
+    min-width: 0;
+  }
+
+  .console .console-region span {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .console .console-region span + span {
+    margin-left: 8px;
+  }
+
+  .console .console-region svg {
+    margin-right: 6px;
+    vertical-align: -4px;
+  }
+
+  .mobile-tabs {
+    grid-area: tabs;
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .mobile-tabs [role='tab'] {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 44px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .mobile-tabs [role='tab'][aria-selected='true'] {
+    background: var(--accent-soft);
+    color: var(--text);
   }
 }

@@ -26,3 +26,10 @@ dist-ssr
 # Test output
 test-results
 playwright-report
+
+# Impeccable review captures and decision-page runtime state
+.impeccable/review/
+.impeccable/questions/
+
+# Superpowers plan-execution workspaces (ledgers, briefs)
+.superpowers/
