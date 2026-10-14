@@ -1,0 +1,99 @@
+/* Change --card-min to 260px and the cards rewrap into fewer columns */
+:root {
+  --card-min: 120px;
+  --page: #f6f9fc;
+  --ink: #0a2540;
+  --muted: #425466;
+  --accent: #635bff;
+  --accent-light: #a5a0ff;
+  --lift: 0 13px 27px -5px rgb(50 50 93 / 0.25), 0 8px 16px -8px rgb(0 0 0 / 0.3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--page);
+  color: var(--ink);
+  font-family: 'Manrope', system-ui, sans-serif;
+}
+
+header { max-width: 60ch; margin-bottom: 18px; }
+
+h1 {
+  margin: 0 0 6px;
+  font-size: clamp(20px, 5vmin, 28px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+header p,
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+code,
+.name {
+  font-family: ui-monospace, monospace;
+  color: var(--accent);
+}
+
+/* The lesson: wrap onto new rows, grow to fill each one */
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cards li {
+  display: flex;
+  flex: 1 1 var(--card-min);
+}
+
+.card {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 2px 5px -1px rgb(50 50 93 / 0.25), 0 1px 3px -1px rgb(0 0 0 / 0.3);
+  transition: translate 0.2s, box-shadow 0.2s;
+}
+
+.card:hover { translate: 0 -2px; box-shadow: var(--lift); }
+.card[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--accent), var(--lift); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.name { font-size: 14px; font-weight: 700; }
+
+/* Each thumbnail is itself a tiny flex container showing its property */
+.demo { display: flex; gap: 4px; height: 32px; margin-bottom: 6px; padding: 8px; border-radius: 8px; background: var(--page); }
+.demo i { flex: 0 0 18px; border-radius: 3px; background: var(--accent); }
+.demo i:nth-child(even) { background: var(--accent-light); }
+.wrap { flex-wrap: wrap; align-content: flex-start; }
+.wrap i { flex-basis: 26%; height: 14px; }
+.grow i:nth-child(2) { flex-grow: 1; }
+.gap { gap: 14px; }
+.align { align-items: center; }
+.align i { height: 100%; }
+.align i:nth-child(1) { height: 60%; }
+.align i:nth-child(3) { height: 35%; }
+.justify { justify-content: space-between; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}

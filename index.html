@@ -38,11 +38,22 @@
           <span>Cody</span>
       </div>
 
+      <!-- EXAMPLES (options are rendered from src/examples) -->
+      <div id="examples-button-container" class="btn-containers">
+        <button id="examples-button" class="left-navbar-buttons" aria-expanded="false" aria-controls="examples-menu">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-collection" viewBox="0 0 16 16">
+            <path d="M2.5 3.5a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1h-11zm2-2a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1h-7zM0 13a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 16 13V6a1.5 1.5 0 0 0-1.5-1.5h-13A1.5 1.5 0 0 0 0 6v7zm1.5.5A.5.5 0 0 1 1 13V6a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-13z"/>
+          </svg>
+          <span class="button-label">Examples</span>
+        </button>
+        <div id="examples-menu" class="drop-down-menu-container examples-menu" hidden></div>
+      </div>
+
       <!-- FONT SIZE -->
       <div id="font-size-button-container" class="btn-containers">
         <button id="font-size-button" class="left-navbar-buttons" aria-expanded="false" aria-controls="font-size-menu">
           <svg xmlns="http://www.w3.org/2000/svg" height="24" fill="currentcolor" viewBox="0 -960 960 960" width="24"><path d="M560-160v-520H360v-120h520v120H680v520H560Zm-360 0v-320H80v-120h360v120H320v320H200Z"/></svg>
-          Font-Size
+          <span class="button-label">Font-Size</span>
         </button>
         <div id="font-size-menu" class="drop-down-menu-container" hidden>
           <button type="button" data-value="14">14 px</button>
@@ -61,7 +72,7 @@
             <path d="M8 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm4 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5.5 7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm.5 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
             <path d="M16 8c0 3.15-1.866 2.585-3.567 2.07C11.42 9.763 10.465 9.473 10 10c-.603.683-.475 1.819-.351 2.92C9.826 14.495 9.996 16 8 16a8 8 0 1 1 8-8zm-8 7c.611 0 .654-.171.655-.176.078-.146.124-.464.07-1.119-.014-.168-.037-.37-.061-.591-.052-.464-.112-1.005-.118-1.462-.01-.707.083-1.61.704-2.314.369-.417.845-.578 1.272-.618.404-.038.812.026 1.16.104.343.077.702.186 1.025.284l.028.008c.346.105.658.199.953.266.653.148.904.083.991.024C14.717 9.38 15 9.161 15 8a7 7 0 1 0-7 7z"/>
           </svg>
-          Theme
+          <span class="button-label">Theme</span>
         </button>
         <div id="theme-menu" class="drop-down-menu-container" hidden>
           <button type="button" data-value="vs-dark">Dark</button>
@@ -76,52 +87,69 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-copy" viewBox="0 0 16 16">
             <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2Zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6ZM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2Z"/>
           </svg>
-          Copy URL
+          <span class="button-label">Copy URL</span>
         </button>
       </div>
     </nav>
   </header>
-  <main>
-      <!-- TOP NAVBAR -->
-      <nav class="top-navbar">
-        <button id="frontend-view-button" class="top-navbar-buttons"> 
-          Frontend View
-          <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" fill="currentColor" width="24"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm320-320v240h240v-240H520Zm0-80h240v-240H520v240Zm-80 0v-240H200v240h240Zm0 80H200v240h240v-240Z"/></svg>
-        </button>
-        <button id="playground-view-button" class="top-navbar-buttons" >
-          Playground View
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-layout-split" viewBox="0 0 16 16">
-            <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm8.5-1v12H14a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H8.5zm-1 0H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h5.5V2z"/>
-          </svg>
-        </button>
-      </nav>
-       <!--  EDITORS  -->
-     <div id="editors-container" class="front-end-view">
-        
-      <div  id="html-editor" class="editors">
-          <img alt="html icon" class="icons" src="/images/html.png">
+  <main id="workspace" class="workspace" data-language="js" data-panel="preview">
+    <section class="pane editor-pane" aria-label="Code editors">
+      <div class="editor-tabs" role="tablist" aria-label="Editor language">
+        <button type="button" role="tab" id="tab-html" data-language="html" aria-controls="html-editor" aria-selected="false" tabindex="-1">HTML<span class="error-dot" hidden></span></button>
+        <button type="button" role="tab" id="tab-css" data-language="css" aria-controls="css-editor" aria-selected="false" tabindex="-1">CSS<span class="error-dot" hidden></span></button>
+        <button type="button" role="tab" id="tab-js" data-language="js" aria-controls="js-editor" aria-selected="true" tabindex="0">JS<span class="error-dot" hidden></span></button>
+      </div>
+      <div id="html-editor" class="editor" role="tabpanel" aria-labelledby="tab-html">
+        <img alt="" class="icons" src="/images/html.png">
+      </div>
+      <div id="css-editor" class="editor" role="tabpanel" aria-labelledby="tab-css">
+        <img alt="" class="icons" src="/images/css.png">
+      </div>
+      <div id="js-editor" class="editor" role="tabpanel" aria-labelledby="tab-js">
+        <img alt="" class="icons" src="/images/js.png">
+      </div>
+    </section>
+
+    <div class="handle handle-split" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize the editor and preview"></div>
+
+    <section class="pane preview-pane" aria-label="Preview">
+      <div class="device-toolbar" role="toolbar" aria-label="Preview size">
+        <div class="device-presets" role="group" aria-label="Device width">
+          <button type="button" data-width="375" aria-pressed="false">Phone</button>
+          <button type="button" data-width="768" aria-pressed="false">Tablet</button>
+          <button type="button" data-width="full" aria-pressed="true">Full</button>
         </div>
-    
-        <div id="css-editor" class="editors">
-          <img alt="css icon" class="icons" src="/images/css.png">
+        <span class="frame-readout"></span>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="preview-action" id="fullscreen-button">Fullscreen</button>
+        <button type="button" class="preview-action" id="open-tab-button">Open in new tab</button>
+      </div>
+      <div class="preview-stage">
+        <div class="preview-frame">
+          <!-- Sandboxed without allow-same-origin: shared links run third-party code -->
+          <iframe title="Website Preview" id="page" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
+          <div class="handle handle-frame" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize the preview width"></div>
         </div>
-    
-        <div id="js-editor" class="editors">
-          <img alt="javascript icon" class="icons" src="/images/js.png">
-        </div>
-        <!--  PREVIEW SCREEN -->
-        <!-- Sandboxed without allow-same-origin: shared links run third-party code -->
-        <iframe title="Website Preview" class="editors" id="page" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
-        <!-- CONSOLE -->
-        <div id="console" class="console editors">
-        </div>
-   
-    </div>
-    <!-- COPY URL POP UP -->
-    <div id="url-copy-container" class="url-copy-container" role="status" aria-live="polite">
-      <span>URL Copied to Clipboard</span>
-  </div>
+      </div>
+    </section>
+
+    <div class="handle handle-console" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize the console"></div>
+
+    <section id="console" class="pane console" aria-label="Console"></section>
+
+    <nav class="mobile-tabs" role="tablist" aria-label="Panels">
+      <button type="button" role="tab" data-language="html" aria-controls="html-editor" aria-selected="false" tabindex="-1">HTML<span class="error-dot" hidden></span></button>
+      <button type="button" role="tab" data-language="css" aria-controls="css-editor" aria-selected="false" tabindex="-1">CSS<span class="error-dot" hidden></span></button>
+      <button type="button" role="tab" data-language="js" aria-controls="js-editor" aria-selected="false" tabindex="-1">JS<span class="error-dot" hidden></span></button>
+      <button type="button" role="tab" data-panel="preview" aria-controls="page" aria-selected="true" tabindex="0">Preview</button>
+      <button type="button" role="tab" data-panel="console" aria-controls="console" aria-selected="false" tabindex="-1">Console</button>
+    </nav>
   </main>
+
+  <!-- COPY URL / OPEN TAB POP UP -->
+  <div id="url-copy-container" class="url-copy-container" role="status" aria-live="polite">
+    <span>URL Copied to Clipboard</span>
+  </div>
 
   <script type="module" src="/main.js">
   </script>

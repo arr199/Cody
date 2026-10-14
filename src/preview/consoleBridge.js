@@ -89,11 +89,12 @@ export function consoleBridgeScript () {
 </script>`
 }
 
-// Calls handler(type, args) for console messages coming from the preview.
-// Messages from anywhere else, or in any other shape, are ignored.
-export function onConsoleMessage (iframe, handler) {
+// Calls handler(type, args) for console messages coming from the current
+// preview window. Messages from anywhere else, from an earlier render, or in
+// any other shape, are ignored.
+export function onConsoleMessage (getPreviewWindow, handler) {
   window.addEventListener('message', (e) => {
-    if (e.source !== iframe.contentWindow) return
+    if (e.source !== getPreviewWindow()) return
     const data = e.data
     if (!data || data.source !== MESSAGE_SOURCE || !Array.isArray(data.args)) return
     handler(String(data.type), data.args.map(String))

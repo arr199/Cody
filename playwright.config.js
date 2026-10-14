@@ -5,6 +5,8 @@ const PORT = 4179
 export default defineConfig({
   testDir: 'test/e2e',
   timeout: 60_000,
+  // Monaco's language workers start slowly when many browsers run in parallel
+  expect: { timeout: 10_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? 'github' : 'list',

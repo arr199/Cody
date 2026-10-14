@@ -1,7 +1,5 @@
 import { API } from '../utils/API'
 
-const TOAST_DURATION = 1500
-
 async function shortenUrl (url) {
   const res = await fetch(API.LINK_SHORTENER_URL, {
     method: 'POST',
@@ -37,25 +35,16 @@ async function copyToClipboard (textPromise) {
   }
 }
 
+// toast: the object returned by createToast() in ./toast
 export function setupCopyUrl (button, toast) {
-  const toastText = toast.querySelector('span')
-  let hideTimer
-
-  function showToast (message) {
-    toastText.textContent = message
-    toast.classList.add('visible')
-    clearTimeout(hideTimer)
-    hideTimer = setTimeout(() => toast.classList.remove('visible'), TOAST_DURATION)
-  }
-
   button.addEventListener('click', async () => {
     button.disabled = true
     try {
       await copyToClipboard(getShareLink())
-      showToast('URL Copied to Clipboard')
+      toast.show('URL Copied to Clipboard')
     } catch (err) {
       console.error('Could not copy the URL.', err)
-      showToast("Couldn't copy the URL")
+      toast.show("Couldn't copy the URL")
     } finally {
       button.disabled = false
     }

@@ -1,10 +1,13 @@
 // Disclosure-style dropdowns: a toggle button controls a `hidden` container of
-// option buttons, each carrying its value in `data-value`.
-export function createMenu (button, menu, onSelect) {
+// option buttons, each carrying its value in `data-value`. `onToggle(open)`
+// runs whenever the menu actually opens or closes.
+export function createMenu (button, menu, onSelect, { onToggle } = {}) {
   function setOpen (open) {
+    const changed = menu.hidden === open
     menu.hidden = !open
     button.setAttribute('aria-expanded', String(open))
     button.classList.toggle('buttons-active', open)
+    if (changed) onToggle?.(open)
   }
 
   button.addEventListener('click', () => setOpen(menu.hidden))

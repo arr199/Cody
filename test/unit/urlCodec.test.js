@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { encode } from 'js-base64'
-import { encodeState, decodeState } from '../../src/state/urlCodec'
+import { encodeState, decodeState, hasCode } from '../../src/state/urlCodec'
 
 const fromHash = (state) => decodeState({ hash: `#${state}`, pathname: '/' })
 
@@ -24,6 +24,11 @@ describe('urlCodec', () => {
   it('keeps empty parts in their positions', () => {
     const code = { html: '', css: 'body {}', js: '' }
     expect(fromHash(encodeState(code))).toEqual(code)
+  })
+
+  it('tells whether any editor has code', () => {
+    expect(hasCode({ html: '', css: '', js: '' })).toBe(false)
+    expect(hasCode({ html: '', css: 'p {}', js: '' })).toBe(true)
   })
 
   it('encodes no code as an empty string', () => {
