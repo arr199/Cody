@@ -452,12 +452,19 @@ header {
   pointer-events: none;
 }
 
-.editor-tabs {
+.editor-bar {
   flex: none;
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   padding: 6px 8px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.editor-tabs {
+  display: flex;
+  align-self: flex-end;
+  gap: 2px;
 }
 
 .editor-tabs [role='tab'] {
@@ -494,6 +501,127 @@ header {
 
 .error-dot[hidden] {
   display: none;
+}
+
+/* RUN CONTROLS: the auto-run switch and Run, beside the editor tabs */
+.run-controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.editor-bar .run-controls {
+  margin-left: auto;
+  padding-bottom: 6px;
+}
+
+.auto-run,
+.run-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.auto-run:hover {
+  color: var(--text);
+}
+
+.switch-track {
+  position: relative;
+  width: 24px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--border-strong);
+  transition: background 0.15s var(--ease);
+}
+
+.switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.auto-run[aria-checked='true'] .switch-track {
+  background: var(--accent);
+}
+
+.auto-run[aria-checked='true'] .switch-track::after {
+  transform: translateX(10px);
+  background: var(--accent-contrast);
+}
+
+.run-button {
+  padding-inline: 10px;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.run-button svg {
+  width: 10px;
+  height: 10px;
+  fill: currentColor;
+}
+
+.run-button:hover {
+  background: var(--surface-hover);
+}
+
+/* Auto-run is off and the preview hasn't run the latest edits */
+.run-button[data-stale] {
+  border-color: transparent;
+  background: var(--accent-soft);
+}
+
+.run-button[data-stale]::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* The focus ring is the Indigo Wash, which a stale Run is already filled with */
+.run-button:focus-visible {
+  border-color: var(--accent);
+}
+
+/* The phone copy in the preview toolbar shows only in the phone layout */
+.device-toolbar .run-controls {
+  display: none;
+}
+
+/* A narrow editor keeps one row: tighter tabs, and the switch drops its word */
+.editor-pane {
+  container-type: inline-size;
+}
+
+@container (max-width: 360px) {
+  .editor-tabs [role='tab'] {
+    padding-inline: 10px;
+  }
+
+  .auto-run-label {
+    display: none;
+  }
 }
 
 /* Only the selected language's editor shows; the other two stay mounted */
@@ -854,7 +982,7 @@ header {
   .workspace[data-panel='preview'] :is(.editor-pane, .console),
   .workspace[data-panel='console'] :is(.editor-pane, .preview-pane),
   .handle,
-  .editor-tabs,
+  .editor-bar,
   .device-presets,
   .frame-readout {
     display: none;
@@ -862,6 +990,11 @@ header {
 
   .preview-frame {
     width: 100%;
+  }
+
+  .device-toolbar .run-controls {
+    display: flex;
+    margin-right: auto;
   }
 
   /* Console lines flow as one wrapping paragraph instead of scrolling sideways */
@@ -915,5 +1048,13 @@ header {
   .mobile-tabs [role='tab'][aria-selected='true'] {
     background: var(--accent-soft);
     color: var(--text);
+  }
+}
+
+/* Narrow phones keep the preview toolbar on one row: the switch drops its word,
+   as it does in a narrow editor bar */
+@media (max-width: 420px) {
+  .device-toolbar .auto-run-label {
+    display: none;
   }
 }

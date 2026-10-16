@@ -33,3 +33,5 @@ playwright-report
 
 # Superpowers plan-execution workspaces (ledgers, briefs)
 .superpowers/
+
+/.impeccable

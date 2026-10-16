@@ -94,10 +94,22 @@
   </header>
   <main id="workspace" class="workspace" data-language="js" data-panel="preview">
     <section class="pane editor-pane" aria-label="Code editors">
-      <div class="editor-tabs" role="tablist" aria-label="Editor language">
-        <button type="button" role="tab" id="tab-html" data-language="html" aria-controls="html-editor" aria-selected="false" tabindex="-1">HTML<span class="error-dot" hidden></span></button>
-        <button type="button" role="tab" id="tab-css" data-language="css" aria-controls="css-editor" aria-selected="false" tabindex="-1">CSS<span class="error-dot" hidden></span></button>
-        <button type="button" role="tab" id="tab-js" data-language="js" aria-controls="js-editor" aria-selected="true" tabindex="0">JS<span class="error-dot" hidden></span></button>
+      <!-- Run controls sit beside the tabs, not inside the tablist (ARIA allows only tabs there).
+           On phones a second copy lives in the preview toolbar; both follow one runner. -->
+      <div class="editor-bar">
+        <div class="editor-tabs" role="tablist" aria-label="Editor language">
+          <button type="button" role="tab" id="tab-html" data-language="html" aria-controls="html-editor" aria-selected="false" tabindex="-1">HTML<span class="error-dot" hidden></span></button>
+          <button type="button" role="tab" id="tab-css" data-language="css" aria-controls="css-editor" aria-selected="false" tabindex="-1">CSS<span class="error-dot" hidden></span></button>
+          <button type="button" role="tab" id="tab-js" data-language="js" aria-controls="js-editor" aria-selected="true" tabindex="0">JS<span class="error-dot" hidden></span></button>
+        </div>
+        <div class="run-controls">
+          <button type="button" class="auto-run" role="switch" aria-checked="true" aria-label="Auto-run" title="Run the code as you type">
+            <span class="switch-track" aria-hidden="true"></span><span class="auto-run-label">Auto</span>
+          </button>
+          <button type="button" class="run-button" aria-keyshortcuts="Control+Enter Meta+Enter">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1.3v7.4a.6.6 0 0 0 .92.5l5.9-3.7a.6.6 0 0 0 0-1L2.92.8A.6.6 0 0 0 2 1.3z"/></svg>Run
+          </button>
+        </div>
       </div>
       <div id="html-editor" class="editor" role="tabpanel" aria-labelledby="tab-html">
         <img alt="" class="icons" src="/images/html.png">
@@ -114,6 +126,14 @@
 
     <section class="pane preview-pane" aria-label="Preview">
       <div class="device-toolbar" role="toolbar" aria-label="Preview size">
+        <div class="run-controls">
+          <button type="button" class="auto-run" role="switch" aria-checked="true" aria-label="Auto-run" title="Run the code as you type">
+            <span class="switch-track" aria-hidden="true"></span><span class="auto-run-label">Auto</span>
+          </button>
+          <button type="button" class="run-button" aria-keyshortcuts="Control+Enter Meta+Enter">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1.3v7.4a.6.6 0 0 0 .92.5l5.9-3.7a.6.6 0 0 0 0-1L2.92.8A.6.6 0 0 0 2 1.3z"/></svg>Run
+          </button>
+        </div>
         <div class="device-presets" role="group" aria-label="Device width">
           <button type="button" data-width="375" aria-pressed="false">Phone</button>
           <button type="button" data-width="768" aria-pressed="false">Tablet</button>

@@ -165,6 +165,14 @@ components:
     typography: "{typography.toolbar}"
     rounded: "{rounded.radius-sm}"
     padding: "4px 10px"
+  run-button:
+    textColor: "{colors.text}"
+    typography: "{typography.toolbar}"
+    rounded: "{rounded.radius-sm}"
+    padding: "4px 10px"
+  run-button-stale:
+    backgroundColor: "{colors.accent-soft}"
+    textColor: "{colors.text}"
   preview-stage:
     backgroundColor: "{colors.surface-2}"
   preview-frame:
@@ -311,7 +319,7 @@ Dropdowns hang 6px below their rail button and match its width. The exception is
 - The body becomes a column. The rail turns into a compact top bar: the wordmark on the left, then four 40px square icon buttons with 18px icons. Their labels are visually hidden but stay as the accessible names. The bar uses a 6px gap and 6px × 10px padding, with a hairline underneath.
 - Every menu, including Examples, opens fixed and full width under the bar (60px from the top, 8px from each edge).
 - The workspace shows one panel at a time above a bottom tab bar (HTML · CSS · JS · Preview · Console), with 8px padding and an 8px gap. The app opens on Preview.
-- The handles, the editor tab strip, the presets and the readout are hidden, because the phone is the device. The device toolbar keeps Fullscreen and Open in new tab.
+- The handles, the editor tab strip, the presets and the readout are hidden, because the phone is the device. The device toolbar keeps Fullscreen and Open in new tab, and leads with the run controls. Below 420px the auto-run switch drops its word to keep the bar on one row.
 
 The spacing rhythm is 4 / 6 / 8 / 10 / 12 / 18px:
 
@@ -381,6 +389,14 @@ A folder-tab strip at the top of the editor pane, a WAI-ARIA tablist driven by c
 - **Tab:** no fill, Graphite Tab type, 7px × 14px padding, top corners rounded. Hover turns the label Chalk.
 - **Selected:** a Raised Key fill with a Chalk label, joined to the editor below. No indigo.
 - **Error dot:** a 7px Console Coral circle after the label whenever that language has error markers. The phone tab bar shows the same dot on its HTML, CSS and JS tabs.
+
+### Run controls
+
+An auto-run switch and a Run button, at the right end of the editor tab strip (beside the tablist, never inside it). On phones the same pair leads the device toolbar.
+
+- **Auto-run switch:** a 24 × 14px track with a 10px knob and the word "Auto" in Graphite Toolbar type (accessible name "Auto-run"). Off, the track is Strong Hairline and the knob Graphite; on, the track is Workbench Indigo and the knob white. When the editor pane is 360px or narrower, the word drops and the tabs tighten to 10px side padding, so the strip stays one row.
+- **Run:** a hairline-outlined button with a 7px radius, a 10px drawn play triangle and a Chalk "Run" label; hover takes Raised Key. Its title names the shortcut (Ctrl+Enter, or ⌘+Enter on a Mac).
+- **Out of date:** with auto-run off and unrun edits, Run takes the Indigo Wash, drops its outline and gains a 6px Workbench Indigo dot after the label; its accessible name becomes "Run, preview out of date". Keyboard focus adds a Workbench Indigo border, since the focus ring is the same wash.
 
 ### Resize handles
 

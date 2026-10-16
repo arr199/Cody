@@ -135,6 +135,129 @@ test.describe('preview and console', () => {
   })
 })
 
+test.describe('run control', () => {
+  const autoRun = (page) => page.locator('.editor-bar').getByRole('switch', { name: 'Auto-run' })
+  const runButton = (page) => page.locator('.editor-bar').getByRole('button', { name: /^Run/ })
+
+  test('with auto-run off, edits wait for Run, which shows the preview is out of date', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p id="t">one</p>' }))
+    const firstUrl = page.url()
+    await autoRun(page).click()
+    await expect(autoRun(page)).toHaveAttribute('aria-checked', 'false')
+
+    await focusEditorEnd(page, '#html-editor')
+    await page.keyboard.type(' two')
+    await page.waitForTimeout(900) // HTML would have re-run after 0.5 s
+    await expect(preview(page).locator('body')).toHaveText('one')
+    await expect(runButton(page)).toHaveAccessibleName('Run, preview out of date')
+    await expect(runButton(page)).toHaveAttribute('data-stale', '')
+    expect(page.url()).not.toBe(firstUrl) // the link still follows the editors
+
+    // Ctrl+Enter in the editor runs it, without adding a line
+    await page.keyboard.press('Control+Enter')
+    await expect(preview(page).locator('body')).toHaveText('one two')
+    await expect(runButton(page)).toHaveAccessibleName('Run')
+    await expect(page.locator('#html-editor .view-line')).toHaveCount(1)
+  })
+
+  test('Run re-runs the code straight away', async ({ page }) => {
+    await openApp(page, shareLink({ js: 'document.body.dataset.run = Math.random()' }))
+    const body = preview(page).locator('body')
+    await expect(body).toHaveAttribute('data-run', /\d/)
+    const first = await body.getAttribute('data-run')
+    await runButton(page).click()
+    await expect(body).not.toHaveAttribute('data-run', first)
+    await expect(runButton(page)).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter')
+  })
+
+  test('turning auto-run back on runs out-of-date code', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>one</p>' }))
+    await autoRun(page).click()
+    await focusEditorEnd(page, '#html-editor')
+    await page.keyboard.type(' two')
+    await expect(runButton(page)).toHaveAttribute('data-stale', '')
+    await autoRun(page).click()
+    await expect(preview(page).locator('body')).toHaveText('one two')
+    await expect(runButton(page)).not.toHaveAttribute('data-stale')
+  })
+
+  test('remembers auto-run off, and still runs code that is loaded', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>first</p>' }))
+    await autoRun(page).click()
+
+    await page.goto(shareLink({ html: '<p>second</p>' })) // another link in the same tab
+    await expect(preview(page).locator('body')).toHaveText('second')
+
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toHaveCount(3)
+    await expect(autoRun(page)).toHaveAttribute('aria-checked', 'false')
+    await expect(preview(page).locator('body')).toHaveText('second')
+    await expect(runButton(page)).not.toHaveAttribute('data-stale')
+  })
+
+  test('the editor bar fits its controls at the narrowest split', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('.handle-split').focus()
+    await page.keyboard.press('Home')
+    const pane = await page.locator('.editor-pane').boundingBox()
+    const tab = await page.locator('#tab-js').boundingBox()
+    for (const control of await page.locator('.editor-bar button:visible').all()) {
+      const box = await control.boundingBox()
+      expect(box.x + box.width).toBeLessThanOrEqual(pane.x + pane.width + 0.5)
+      expect(box.y).toBeGreaterThanOrEqual(tab.y - 1) // one row, beside the tabs
+      expect(box.y + box.height).toBeLessThanOrEqual(tab.y + tab.height + 1)
+    }
+  })
+
+  test('on phones, the controls sit in the preview toolbar', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openApp(page, shareLink({ html: '<p>one</p>' }))
+    const toolbar = page.locator('.device-toolbar')
+    const phoneRun = toolbar.getByRole('button', { name: /^Run/ })
+    await expect(page.locator('.editor-bar')).toBeHidden()
+    await toolbar.getByRole('switch', { name: 'Auto-run' }).click()
+
+    await page.locator('.mobile-tabs [data-language="html"]').click()
+    await page.locator('#html-editor .view-lines').click()
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type(' two')
+    await page.locator('.mobile-tabs [data-panel="preview"]').click()
+    await expect(phoneRun).toHaveAccessibleName('Run, preview out of date')
+
+    await phoneRun.click()
+    await expect(preview(page).locator('body')).toHaveText('one two')
+  })
+})
+
+test.describe('loop guard', () => {
+  test('stops an infinite loop in the JS pane and runs the rest of the script', async ({ page }) => {
+    const js = "console.log('before')\nwhile (true) {}\ndocument.body.append('after the loop')"
+    await openApp(page, shareLink({ js }))
+
+    await expect(preview(page).locator('body')).toHaveText('after the loop')
+    const stopped = consoleRows(page).filter({ hasText: 'Stopped a loop at JS line 2 after 1 s. It may be infinite.' })
+    await expect(stopped).toHaveClass('error')
+    await expect(consoleRows(page).filter({ hasText: 'before' })).toHaveCount(1)
+
+    // The app is still responsive
+    await page.locator('#tab-css').click()
+    await expect(page.locator('#css-editor')).toBeVisible()
+  })
+
+  test('stops an infinite loop in a script in the HTML pane', async ({ page }) => {
+    const html = "<p id=\"t\">waiting</p>\n<script>\nfor (;;) {}\ndocument.getElementById('t').textContent = 'done'\n</script>"
+    await openApp(page, shareLink({ html }))
+
+    await expect(preview(page).locator('#t')).toHaveText('done')
+    await expect(consoleRows(page).filter({ hasText: 'Stopped a loop at HTML line 3' })).toHaveCount(1)
+  })
+
+  test('guards the preview opened in a new tab too', async ({ page }) => {
+    await page.goto('/preview.html' + shareLink({ js: "while (true) {}\ndocument.body.append('after the loop')" }).slice(1))
+    await expect(page.frameLocator('#page').locator('body')).toHaveText('after the loop')
+  })
+})
+
 test.describe('preview history', () => {
   test('re-rendering the preview does not add browser history entries', async ({ page }) => {
     await openApp(page, shareLink({ html: '<p>hi</p>', js: "console.log('v1')" }))
@@ -532,7 +655,7 @@ test.describe('device preview', () => {
     await openApp(page, shareLink({ html: '<p>x</p>' }))
     await page.getByRole('button', { name: 'Tablet' }).click() // the longest readout
     const pane = await page.locator('.preview-pane').boundingBox()
-    for (const control of await page.locator('.device-toolbar button, .frame-readout').all()) {
+    for (const control of await page.locator('.device-toolbar :is(button, .frame-readout):visible').all()) {
       const box = await control.boundingBox()
       expect(box.x).toBeGreaterThanOrEqual(pane.x)
       expect(box.x + box.width).toBeLessThanOrEqual(pane.x + pane.width + 0.5)

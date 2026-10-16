@@ -57,6 +57,8 @@ Run `pnpm lint`, `pnpm test` and `pnpm test:e2e` (which also builds) before repo
 - `src/preview/buildDocument.js`: builds the preview's HTML document.
 - `src/preview/previewFrame.js`: swaps in a fresh iframe on every render. Setting `srcdoc` on the same iframe would add a browser history entry each time and break the Back button.
 - `src/preview/consoleBridge.js`: the script injected into the preview (console forwarding plus a safe serializer), and the app-side message listener.
+- `src/preview/loopGuard.js`: rewrites the preview's copy of the code (JS pane and inline HTML scripts, parsed with acorn) so a loop running over 1 s breaks and reports its line. The runtime it calls is injected by `consoleBridge.js`. Editors and share links keep the original code.
+- `src/preview/runner.js`: decides when the preview runs. Auto-run (remembered) runs after each language's typing delay; with it off, edits wait for Run and the preview is marked out of date. Loaded code always runs.
 - `src/preview/deviceToolbar.js`: the preview's width presets, free-drag frame width with a px readout, and fullscreen.
 - `src/preview/openInTab.js`, `preview.html` and `src/preview/standalone.js`: Open in new tab renders the code from the URL hash in the same sandbox as the app's preview.
 - `vite.config.js`: declares both pages (`index.html`, `preview.html`) for the build.
@@ -66,6 +68,7 @@ Run `pnpm lint`, `pnpm test` and `pnpm test:e2e` (which also builds) before repo
   - `workspace.js`: the one owner of which editor and which panel are showing (`data-language` / `data-panel` on `#workspace`).
   - `tabs.js`: the desktop editor tabs and the phone tab bar (WAI-ARIA tablists), plus the error dots.
   - `splitter.js` and `layout.js`: the resizable editor/preview split and console drawer, with sizes kept in localStorage.
+  - `runControls.js`: the auto-run switch and Run button (in the editor bar, and in the preview toolbar on phones) and the Ctrl/Cmd+Enter shortcut.
   - `menus.js` (dropdowns), `examplesMenu.js` (the Examples menu with its live preview), `preferences.js` (theme and font size), `copyUrl.js` (shortened share link), `toast.js` (the shared status message).
 - `src/utils/`: API constants, `debounce`, and static icons.
 - `test/`: see Testing above.

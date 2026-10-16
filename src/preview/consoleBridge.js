@@ -1,6 +1,8 @@
 // Forwards console output and uncaught errors from the sandboxed preview
 // iframe to the app with postMessage.
 
+import { createLoopRuntime } from './loopGuard'
+
 const MESSAGE_SOURCE = 'cody-console'
 
 // Turns any value into display text without throwing (circular references,
@@ -78,6 +80,10 @@ export function consoleBridgeScript () {
       send(typeByMethod[method], args)
       if (original) return original.apply(console, args)
     }
+  })
+  // Called by guarded loops (see loopGuard.js); a stopped loop is reported as an error
+  Object.defineProperty(window, '__codyLoop', {
+    value: (${createLoopRuntime.toString()})(function (message) { send('error', [message]) })
   })
   window.addEventListener('error', function (e) {
     send('error', ['Uncaught', e.error || e.message])

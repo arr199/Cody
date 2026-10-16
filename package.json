@@ -20,6 +20,8 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
+    "acorn": "^8.19.0",
+    "acorn-walk": "^8.3.5",
     "emmet-monaco-es": "^5.7.0",
     "js-base64": "^3.9.4",
     "monaco-editor": "^0.57.0"

@@ -4,6 +4,7 @@ import { EXAMPLES, DEFAULT_EXAMPLE_ID, getExample } from './src/examples'
 import { buildDocument } from './src/preview/buildDocument'
 import { onConsoleMessage } from './src/preview/consoleBridge'
 import { createPreviewFrame } from './src/preview/previewFrame'
+import { createRunner } from './src/preview/runner'
 import { createConsolePanel } from './src/console/consolePanel'
 import { loadPreferences, applyTheme, saveFontSize } from './src/ui/preferences'
 import { createMenu, closeMenusOnOutsideInteraction } from './src/ui/menus'
@@ -15,12 +16,15 @@ import { setupCopyUrl } from './src/ui/copyUrl'
 import { createToast } from './src/ui/toast'
 import { setupOpenInTab } from './src/preview/openInTab'
 import { renderExamplesMenu } from './src/ui/examplesMenu'
+import { connectRunControls } from './src/ui/runControls'
 import { debounce } from './src/utils/debounce'
 
 // Every preview render re-runs the user's JS, so JS edits wait longer
 // before re-rendering than HTML and CSS edits.
 const RENDER_DELAY = { html: 500, css: 500, js: 1500 }
 const ERRORS_DELAY = 1500
+// The share link follows the editors whether or not the preview runs
+const URL_DELAY = 500
 
 function bootstrap () {
   const $ = (selector) => document.querySelector(selector)
@@ -75,18 +79,25 @@ function bootstrap () {
     return import.meta.env.BASE_URL + (state ? `#${state}` : '')
   }
 
-  function update () {
-    const code = readCode(editors)
-    consolePanel.clearLogs()
-    preview.render(buildDocument(code))
-    history.replaceState(null, '', urlFor(code))
+  function saveUrl () {
+    history.replaceState(null, '', urlFor(readCode(editors)))
   }
+  const saveUrlSoon = debounce(saveUrl, URL_DELAY)
 
-  let renderTimer
+  // RUN: auto-run, the Run button and Ctrl/Cmd+Enter decide when this happens
+  const runner = createRunner({
+    run () {
+      consolePanel.clearLogs()
+      preview.render(buildDocument(readCode(editors)))
+    },
+    delays: RENDER_DELAY
+  })
+  connectRunControls(document.querySelectorAll('.run-controls'), runner)
+
   let loading = false
 
-  // setValue fires change events synchronously; `loading` keeps them from
-  // scheduling extra renders on top of the immediate one.
+  // Loaded code always runs, even with auto-run off. setValue fires change
+  // events synchronously; `loading` keeps them from counting as edits.
   function loadCode (code) {
     workspace.select({ language: 'js', panel: workspace.state.panel }) // loaded code opens on JS
     loading = true
@@ -94,15 +105,15 @@ function bootstrap () {
     editors.css.setValue(code.css)
     editors.js.setValue(code.js)
     loading = false
-    clearTimeout(renderTimer)
-    update()
+    saveUrl()
+    runner.runNow()
   }
 
   for (const language of ['html', 'css', 'js']) {
     editors[language].onDidChangeModelContent(() => {
       if (loading) return
-      clearTimeout(renderTimer)
-      renderTimer = setTimeout(update, RENDER_DELAY[language])
+      saveUrlSoon()
+      runner.edited(language)
     })
   }
 
@@ -110,7 +121,7 @@ function bootstrap () {
   const linkedCode = decodeState(window.location)
   loadCode(hasCode(linkedCode) ? linkedCode : getExample(DEFAULT_EXAMPLE_ID))
   // Opening another share link in the same tab only changes the hash, which
-  // doesn't reload the page. (replaceState in update() doesn't fire this.)
+  // doesn't reload the page. (replaceState in saveUrl() doesn't fire this.)
   window.addEventListener('hashchange', () => loadCode(decodeState(window.location)))
 
   // EXAMPLES
