@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Script } from 'node:vm'
+import { parse } from 'acorn'
+import { needsModule } from '../../src/preview/packageImports'
 import { EXAMPLES, DEFAULT_EXAMPLE_ID, getExample } from '../../src/examples'
 import { encodeState, decodeState } from '../../src/state/urlCodec'
 
@@ -14,6 +16,11 @@ describe('examples', () => {
       expect(example.meta, example.id).toMatch(/\S/)
       expect(example.description, example.id).toMatch(/\S/)
     }
+  })
+
+  it('include one that imports an npm package on its first line', () => {
+    const [firstLine] = getExample('launch').js.split('\n')
+    expect(firstLine).toBe("import confetti from 'canvas-confetti'")
   })
 
   it('include a blank example with no code', () => {
@@ -61,7 +68,11 @@ describe('examples', () => {
 
   it('have JS that parses and cannot close the preview script tag', () => {
     for (const example of withCode) {
-      expect(() => new Script(example.js), example.id).not.toThrow()
+      // JS that imports packages runs as a module in the preview
+      const run = needsModule(example.js)
+        ? () => parse(example.js, { ecmaVersion: 'latest', sourceType: 'module' })
+        : () => new Script(example.js)
+      expect(run, example.id).not.toThrow()
       expect(example.js, example.id).not.toMatch(/<\/script/i)
     }
   })

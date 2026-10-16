@@ -16,9 +16,10 @@ A playground to test your JavaScript, CSS, and HTML skills.
 - **Device Preview** - Check your page at phone, tablet or any custom width, view it fullscreen, or open it in its own tab.
 - **Works on Phones** - On small screens, a tab bar switches between the editors, the preview and the console.
 - **Run Control** - Code runs as you type, or switch auto-run off and run it when you're ready with the Run button or Ctrl/Cmd+Enter. Cody remembers your choice.
+- **npm Packages** - `import confetti from 'canvas-confetti'` just works: packages load from esm.sh, no install. Pin a version with `'pkg@1.9.3'`. If a package can't load, the console says which one and why.
 - **Loop Protection** - An accidental infinite loop can't freeze the page: Cody stops it after a second, tells you which line it was on in the console, and runs the rest of your code.
 - **URL Sharing**  - A single click allows you to copy the URL, making it simple to showcase your work to colleagues or friends.
-- **Starter Examples** - The Examples menu shows a live preview of each example before you load it: a demoscene-style intro, flexbox cards, fireflies on a canvas, and a cork-board to-do app. A link with no code opens the intro, and Back takes you to your previous code.
+- **Starter Examples** - The Examples menu shows a live preview of each example before you load it: a demoscene-style intro, flexbox cards, fireflies on a canvas, a cork-board to-do app, and a mission-control panel that imports an npm package. A link with no code opens the intro, and Back takes you to your previous code.
 
 > **Note:** The preview runs in a sandboxed iframe, so code from a shared link can't reach the app or your data. As a result, `localStorage`, `sessionStorage` and cookies aren't available to code in the preview.
 

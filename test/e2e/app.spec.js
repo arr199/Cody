@@ -394,6 +394,76 @@ test.describe('console prompt', () => {
   })
 })
 
+// Packages come from the local fake CDN (test/e2e/fakePackageCdn.js): greet
+// and canvas-confetti exist, anything else is a 404, offline-* can't be reached
+test.describe('npm imports', () => {
+  test('runs a package imported by name', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import greet from 'greet'\nconsole.log(greet('cody'))" }))
+    await expect(consoleRows(page)).toHaveText(['hi cody'])
+  })
+
+  test('names a package that does not exist', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import confetti from 'canvas-confeti'\nconsole.log('ran')" }))
+    await expect(consoleRows(page)).toHaveText(["Couldn't load 'canvas-confeti' from esm.sh (404). Check the package name and version."])
+  })
+
+  test('says when the CDN cannot be reached, once per package', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import a from 'offline-one'\nimport b from 'offline-two'" }))
+    await expect(consoleRows(page)).toHaveCount(2)
+    await expect(consoleRows(page).filter({ hasText: "Couldn't reach esm.sh to load 'offline-one'. Check your connection." })).toHaveCount(1)
+    await expect(consoleRows(page).filter({ hasText: "Couldn't reach esm.sh to load 'offline-two'. Check your connection." })).toHaveCount(1)
+    await page.waitForTimeout(500)
+    await expect(consoleRows(page)).toHaveCount(2)
+  })
+
+  test('an unused import is not reported as an editor error', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import greet from 'greet'\nconsole.log('ran')" }))
+    await expect(consoleRows(page)).toHaveText(['ran'])
+    await page.waitForTimeout(2600) // editor errors refresh 1.5 s after a change
+    await expect(consoleRows(page)).toHaveText(['ran'])
+    await expect(page.locator('#tab-js .error-dot')).toBeHidden()
+  })
+
+  test('names a version that does not exist', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import greet from 'greet@9'" }))
+    await expect(consoleRows(page)).toHaveText(["Couldn't load 'greet@9' from esm.sh (404). Check the package name and version."])
+  })
+
+  test('says so when any other import fails to load', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import x from 'https://bad.invalid/x.js'" }))
+    await expect(consoleRows(page)).toHaveText(["A module script couldn't load one of its imports."])
+  })
+
+  test('a page\'s own import map wins over the CDN', async ({ page }) => {
+    const html = '<script type="importmap">{ "imports": { "app": "data:text/javascript,export default \'mapped\'" } }</script>'
+    await openApp(page, shareLink({ html, js: "import app from 'app'\nconsole.log(app)" }))
+    await expect(consoleRows(page)).toHaveText(['mapped'])
+  })
+
+  test('a missing named export reports the real error', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import { nope } from 'greet'" }))
+    await expect(consoleRows(page)).toHaveText([/^UncaughtSyntaxError: .*nope/])
+  })
+
+  test('a pane without static imports still shares variables with the prompt', async ({ page }) => {
+    await openApp(page, shareLink({ js: "const answer = 42\nimport('greet').then(m => console.log(m.default('x')))" }))
+    await expect(consoleRows(page)).toHaveText(['hi x'])
+    await runInConsole(page, 'answer')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['42'])
+  })
+
+  test('await import() works at the prompt', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, "(await import('greet')).version")
+    await expect(page.locator('#console .prompt-result')).toHaveText(['"1.0.0"'])
+  })
+
+  test('Open in new tab runs packages too', async ({ page }) => {
+    await page.goto('/preview.html' + shareLink({ js: "import greet from 'greet'\ndocument.body.append(greet('tab'))" }).slice(1))
+    await expect(page.frameLocator('#page').locator('body')).toHaveText('hi tab')
+  })
+})
+
 test.describe('run control', () => {
   const autoRun = (page) => page.locator('.editor-bar').getByRole('switch', { name: 'Auto-run' })
   const runButton = (page) => page.locator('.editor-bar').getByRole('button', { name: /^Run/ })
@@ -633,6 +703,21 @@ test.describe('examples', () => {
     await expect(preview(page).locator('canvas')).toHaveCount(1)
     await expect(page.locator('#examples-menu')).toBeHidden()
     expect(page.url()).not.toBe(before)
+  })
+
+  test('Launch control imports a package, arms behind its cover, and logs each launch', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('mine')" }))
+    await chooseExample(page, 'launch')
+    const launch = preview(page).getByRole('button', { name: 'Launch' })
+    await expect(launch).toBeDisabled()
+
+    await preview(page).getByRole('button', { name: 'Safety cover' }).click()
+    await expect(preview(page).locator('.state')).toHaveText('ARMED')
+    await launch.click()
+    await expect(consoleRows(page).last()).toContainText('launch: 1')
+    await expect(preview(page).locator('.count')).toHaveText('01')
+    // The fake canvas-confetti records each burst it was asked for
+    expect(await preview(page).locator('body').evaluate(() => window.confettiBursts.length)).toBe(1)
   })
 
   test('examples set their labels in their own typefaces', async ({ page }) => {

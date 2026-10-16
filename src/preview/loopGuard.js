@@ -1,5 +1,6 @@
 import { parse } from 'acorn'
 import { ancestor } from 'acorn-walk'
+import { mapInlineScripts } from './inlineScripts'
 
 // Rewrites the preview's copy of the user's code so a runaway loop can't
 // freeze the app: each loop notes when it was entered, and every iteration
@@ -79,19 +80,11 @@ export function guardScript (code, { pane = 'JS', firstLine = 1, sourceType = 's
   return out + code.slice(last)
 }
 
-const SCRIPT = /(<script\b([^>]*)>)([\s\S]*?)(<\/script\s*>)/gi
-const JS_TYPES = ['', 'module', 'text/javascript', 'application/javascript', 'text/ecmascript', 'application/ecmascript']
-
 // Guards inline <script> blocks typed into the HTML pane. External scripts
 // (src) and data blocks (JSON, templates) are left as they are.
 export function guardHtmlScripts (html) {
-  return html.replace(SCRIPT, (match, open, attributes, body, close, offset) => {
-    if (/(^|\s)src\s*=/i.test(attributes)) return match
-    const type = (attributes.match(/(?:^|\s)type\s*=\s*["']?([^"'\s>]*)/i)?.[1] ?? '').toLowerCase()
-    if (!JS_TYPES.includes(type)) return match
-    const firstLine = html.slice(0, offset + open.length).split('\n').length
-    return open + guardScript(body, { pane: 'HTML', firstLine, sourceType: type === 'module' ? 'module' : 'script' }) + close
-  })
+  return mapInlineScripts(html, ({ open, body, sourceType, firstLine }) =>
+    ({ open, body: guardScript(body, { pane: 'HTML', firstLine, sourceType }) }))
 }
 
 // The `__codyLoop` object guarded code calls. It's stringified into the

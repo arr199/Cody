@@ -60,6 +60,8 @@ Run `pnpm lint`, `pnpm test` and `pnpm test:e2e` (which also builds) before repo
 - `src/preview/valueDescription.js`: snapshots logged values as plain data inside the preview (`createDescriber`, self-contained because it's stringified into the page); `summarize` and the sanitizers run in the app.
 - `src/preview/promptCode.js`: rewrites console prompt entries before they run: the last expression's value, top-level `await`, and the loop guard.
 - `src/preview/loopGuard.js`: rewrites the preview's copy of the code (JS pane and inline HTML scripts, parsed with acorn) so a loop running over 1 s breaks and reports its line. The runtime it calls is injected by `consoleBridge.js`. Editors and share links keep the original code.
+- `src/preview/packageImports.js`: npm imports. Rewrites bare package names (`import x from 'pkg'`, `import('pkg')`) to the CDN in `PACKAGE_CDN` (`src/utils/API.js`, esm.sh; the e2e build points `VITE_PACKAGE_CDN` at the local fake in `test/e2e/fakePackageCdn.js`), and decides when the JS pane must run as a module (static imports, top-level await). A pane that needs no module stays a classic script, so the console prompt sees its variables.
+- `src/preview/inlineScripts.js`: finds the inline JavaScript `<script>` blocks in the HTML pane, for the loop guard and package imports.
 - `src/preview/runner.js`: decides when the preview runs. Auto-run (remembered) runs after each language's typing delay; with it off, edits wait for Run and the preview is marked out of date. Loaded code always runs.
 - `src/preview/deviceToolbar.js`: the preview's width presets, free-drag frame width with a px readout, and fullscreen.
 - `src/preview/openInTab.js`, `preview.html` and `src/preview/standalone.js`: Open in new tab renders the code from the URL hash in the same sandbox as the app's preview.
@@ -67,7 +69,7 @@ Run `pnpm lint`, `pnpm test` and `pnpm test:e2e` (which also builds) before repo
 - `src/console/consolePanel.js`: the only module that writes to `#console`: the header strip (filters with counts, Clear), the log with editor errors in their own region, and the prompt's container.
 - `src/console/valueView.js`: draws a value description as text or an expandable tree.
 - `src/console/consolePrompt.js`: the prompt's keys (Enter runs, Shift+Enter adds a line, ↑/↓ history). Its Monaco keybindings are scoped with a `codyPrompt` context key, because Monaco shares keybindings across editors.
-- `src/examples/`: starter examples. Each folder holds real `markup.html`, `style.css` and `script.js` files, imported as text with `?raw`. `index.js` lists them (`EXAMPLES`, `DEFAULT_EXAMPLE_ID`). A link with no code opens the default example, and loading one pushes a history entry so Back restores the previous code.
+- `src/examples/`: starter examples (`launch` imports an npm package from esm.sh; the others need no network beyond one font). Each folder holds real `markup.html`, `style.css` and `script.js` files, imported as text with `?raw`. `index.js` lists them (`EXAMPLES`, `DEFAULT_EXAMPLE_ID`). A link with no code opens the default example, and loading one pushes a history entry so Back restores the previous code.
 - `src/ui/`: the shell's behaviour.
   - `workspace.js`: the one owner of which editor and which panel are showing (`data-language` / `data-panel` on `#workspace`).
   - `tabs.js`: the desktop editor tabs and the phone tab bar (WAI-ARIA tablists), plus the error dots.

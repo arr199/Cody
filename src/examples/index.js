@@ -12,6 +12,9 @@ import canvasJs from './canvas/script.js?raw'
 import todoHtml from './todo/markup.html?raw'
 import todoCss from './todo/style.css?raw'
 import todoJs from './todo/script.js?raw'
+import launchHtml from './launch/markup.html?raw'
+import launchCss from './launch/style.css?raw'
+import launchJs from './launch/script.js?raw'
 
 // `meta` is the second line in the Examples menu (what the example teaches);
 // `description` is shown beside its live preview
@@ -51,6 +54,15 @@ export const EXAMPLES = [
     html: todoHtml,
     css: todoCss,
     js: todoJs
+  },
+  {
+    id: 'launch',
+    title: 'Launch control',
+    meta: 'npm import · esm.sh',
+    description: 'A mission-control panel powered by an npm package: line 1 imports canvas-confetti from esm.sh, no install. Lift the cover and launch.',
+    html: launchHtml,
+    css: launchCss,
+    js: launchJs
   },
   {
     id: 'blank',

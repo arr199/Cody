@@ -1,5 +1,6 @@
 import { parse } from 'acorn'
 import { guardScript } from './loopGuard'
+import { resolveImports } from './packageImports'
 
 // Rewrites a console prompt entry before it runs in the preview: the last
 // expression's value is reported (__codyPrompt.report), top-level await
@@ -28,7 +29,9 @@ function withResult (code, ast, isAsync) {
   return code.slice(0, start) + wrapped + code.slice(end)
 }
 
-export function preparePromptCode (code) {
+export function preparePromptCode (entry) {
+  // `await import('pkg')` loads the package from the CDN, as in the JS pane
+  const code = resolveImports(entry, { allowAwait: true }).code
   // `{ a: 1 }` on its own is an object, as in DevTools, not a block
   if (/^\s*\{/.test(code) && /\}\s*$/.test(code) && tryParse(`(${code}\n)`, false)) {
     return guardScript(`${REPORT}((${code}\n))`, GUARD)

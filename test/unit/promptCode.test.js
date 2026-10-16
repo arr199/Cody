@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { preparePromptCode } from '../../src/preview/promptCode'
 import { createLoopRuntime } from '../../src/preview/loopGuard'
+import { PACKAGE_CDN } from '../../src/utils/API'
 
 // Runs prepared code the way the preview does, with real report and loop
 // runtimes (a short loop limit keeps tests fast), and collects what it sent.
@@ -41,6 +42,10 @@ describe('preparePromptCode', () => {
     const { results, loops } = await run('for (;;) {}\n"after"')
     expect(loops).toEqual(['Stopped a loop at Console line 1 after 0.02 s. It may be infinite.'])
     expect(results).toEqual(['after'])
+  })
+
+  it('points import() at the package CDN', () => {
+    expect(preparePromptCode("await import('pkg')")).toContain(`import("${PACKAGE_CDN}pkg")`)
   })
 
   it('returns code that does not parse unchanged, so the browser reports it', () => {

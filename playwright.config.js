@@ -1,6 +1,9 @@
 import { defineConfig } from '@playwright/test'
 
 const PORT = 4179
+// esm.sh is replaced in the tests by a local fake (test/e2e/fakePackageCdn.js),
+// so no test reaches, or caches anything from, the real CDN
+const CDN_PORT = 4189
 
 export default defineConfig({
   testDir: 'test/e2e',
@@ -18,10 +21,19 @@ export default defineConfig({
   },
   // Tests run against the production build: the console bridge is stringified
   // into the preview after minification, which only a real build exercises.
-  webServer: {
-    command: `pnpm build && pnpm preview --port ${PORT} --strictPort`,
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000
-  }
+  webServer: [
+    {
+      command: `pnpm build && pnpm preview --port ${PORT} --strictPort`,
+      url: `http://localhost:${PORT}`,
+      env: { VITE_PACKAGE_CDN: `http://127.0.0.1:${CDN_PORT}/` },
+      // A server you started yourself must be built with the same VITE_PACKAGE_CDN
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000
+    },
+    {
+      command: `node test/e2e/fakePackageCdn.js ${CDN_PORT}`,
+      url: `http://127.0.0.1:${CDN_PORT}/greet`,
+      reuseExistingServer: !process.env.CI
+    }
+  ]
 })

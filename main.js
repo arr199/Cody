@@ -66,11 +66,13 @@ function bootstrap () {
     else consolePanel.receive(message)
   })
   // A marker's model tells which editor it belongs to. The console prompt is
-  // a Monaco editor too; its markers aren't editor errors.
+  // a Monaco editor too; its markers aren't editor errors. Neither are hints
+  // ("'x' is declared but never read"), which a JS pane with imports gets.
   const paneOf = new Map(['html', 'css', 'js'].map(language => [editors[language].getModel().uri.toString(), language]))
   const languageOf = (uri) => paneOf.get(uri.toString())
   monaco.editor.onDidChangeMarkers(debounce(() => {
-    const markers = monaco.editor.getModelMarkers({}).filter(marker => languageOf(marker.resource))
+    const markers = monaco.editor.getModelMarkers({})
+      .filter(marker => languageOf(marker.resource) && marker.severity > monaco.MarkerSeverity.Hint)
     consolePanel.setErrors(markers)
     const failing = markers.filter(marker => marker.severity === monaco.MarkerSeverity.Error)
     const failingLanguages = new Set(failing.map(marker => languageOf(marker.resource)))

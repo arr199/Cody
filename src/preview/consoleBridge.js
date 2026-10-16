@@ -1,5 +1,6 @@
 import { createLoopRuntime } from './loopGuard'
 import { createDescriber, sanitizeDescription, sanitizeTable } from './valueDescription'
+import { PACKAGE_CDN } from '../utils/API'
 
 // Forwards console output and uncaught errors from the sandboxed preview
 // iframe to the app with postMessage. Values travel as descriptions
@@ -76,6 +77,27 @@ export function consoleBridgeScript () {
   window.addEventListener('error', function (e) {
     send('error', ['Uncaught', e.error || e.message])
   })
+  // A module script that fails to load usually means one of its packages
+  // couldn't be fetched: check each one it imports (data-packages, as written,
+  // set by buildDocument.js) and say which, and why. If none of them is the
+  // cause (a URL or relative import), still say that something didn't load.
+  window.addEventListener('error', function (e) {
+    const script = e.target
+    if (!(script instanceof HTMLScriptElement) || script.type !== 'module' || !script.dataset.packages) return
+    const checks = JSON.parse(script.dataset.packages).map(function (specifier) {
+      return fetch('${PACKAGE_CDN}' + specifier, { method: 'HEAD' }).then(function (response) {
+        if (response.ok) return false
+        send('error', ["Couldn't load '" + specifier + "' from esm.sh (" + response.status + '). Check the package name and version.'])
+        return true
+      }, function () {
+        send('error', ["Couldn't reach esm.sh to load '" + specifier + "'. Check your connection."])
+        return true
+      })
+    })
+    Promise.all(checks).then(function (reported) {
+      if (reported.indexOf(true) === -1) send('error', ["A module script couldn't load one of its imports."])
+    })
+  }, true)
   window.addEventListener('unhandledrejection', function (e) {
     send('error', ['Uncaught (in promise)', e.reason])
   })
