@@ -1,3 +1,4 @@
+import http from 'node:http'
 import { test, expect } from '@playwright/test'
 import { encode, decode } from 'js-base64'
 
@@ -29,7 +30,7 @@ const preview = (page) => page.frameLocator('#page')
 
 async function openApp (page, path = '/') {
   await page.goto(path)
-  await expect(page.locator('.monaco-editor')).toHaveCount(3)
+  await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
 }
 
 // Opens an editor's tab, clicks into it and puts the cursor at the very end
@@ -135,6 +136,264 @@ test.describe('preview and console', () => {
   })
 })
 
+const valueLine = (scope, key) => scope.locator('.value-line').filter({ hasText: new RegExp(`^${key}(: | => )`) }).first()
+const toggleOf = (scope) => scope.locator(':scope > .value-tree > .value-toggle')
+const filterButton = (page, name) => page.locator('.console-filters').getByRole('button', { name: new RegExp(`^${name} `) })
+
+test.describe('console inspector', () => {
+  test('expands a nested object level by level, with the mouse and the keyboard', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('data', { a: { b: { c: { d: 'deep' } } }, list: [1, 2] })" }))
+    const row = consoleRows(page).first()
+    await expect(row).toHaveText('data{a: {b: {c: {…}}}, list: [1, 2]}')
+
+    const root = row.locator('.value-toggle').first()
+    await root.click()
+    await expect(root).toHaveAttribute('aria-expanded', 'true')
+    await expect(valueLine(row, 'list')).toHaveText('list: [1, 2]')
+
+    const a = toggleOf(valueLine(row, 'a'))
+    await a.focus()
+    await page.keyboard.press('ArrowRight')
+    const b = toggleOf(valueLine(row, 'b'))
+    await expect(b).toHaveText('{c: {d: "deep"}}')
+    await b.focus()
+    await page.keyboard.press('Enter')
+    await toggleOf(valueLine(row, 'c')).click()
+    await expect(valueLine(row, 'd')).toHaveText('d: "deep"')
+
+    await a.focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(a).toHaveAttribute('aria-expanded', 'false')
+    await expect(valueLine(row, 'b')).toBeHidden()
+  })
+
+  test('shows the value from when it was logged', async ({ page }) => {
+    await openApp(page, shareLink({ js: 'const o = { n: 1 }\nconsole.log(o)\no.n = 2\nconsole.log(o)' }))
+    await expect(consoleRows(page)).toHaveText(['{n: 1}', '{n: 2}'])
+    await consoleRows(page).first().locator('.value-toggle').click()
+    await expect(valueLine(consoleRows(page).first(), 'n')).toHaveText('n: 1')
+  })
+
+  test('summarises elements as tags and expands their children', async ({ page }) => {
+    const html = '<ul id="l" class="x"><li>one</li></ul>'
+    await openApp(page, shareLink({ html, js: "console.log(document.getElementById('l'))" }))
+    const row = consoleRows(page).first()
+    await expect(row).toHaveText('<ul id="l" class="x">')
+    await row.locator('.value-toggle').first().click()
+    await toggleOf(valueLine(row, '0')).click()
+    await expect(valueLine(valueLine(row, '0'), '0')).toHaveText('0: "one"')
+  })
+
+  test('an opened value shows its strings in full', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log({ body: 'x'.repeat(300) })" }))
+    const row = consoleRows(page).first()
+    await row.locator('.value-toggle').click()
+    await expect(valueLine(row, 'body')).toHaveText(`body: "${'x'.repeat(300)}"`)
+  })
+
+  test('page code cannot inject markup or stall the console with forged messages', async ({ page }) => {
+    let dialogs = 0
+    page.on('dialog', dialog => { dialogs++; return dialog.dismiss() })
+    const js = [
+      "let deep = { kind: 'string', text: 'bottom' }",
+      "for (let i = 0; i < 200; i++) deep = { kind: 'object', entries: [['k', deep]] }",
+      "parent.postMessage({ source: 'cody-console', type: 'log', args: [{ kind: 'string', text: '<img src=x onerror=alert(1)>' }, deep] }, '*')",
+      "parent.postMessage({ source: 'cody-console', type: 'log', args: [{ kind: 'script', text: 'x' }] }, '*')",
+      "console.log('still here')"
+    ].join('\n')
+    await openApp(page, shareLink({ js }))
+    await expect(consoleRows(page)).toHaveText(['<img src=x onerror=alert(1)>{k: {k: {k: {…}}}}', 'still here'])
+    await expect(page.locator('#console img')).toHaveCount(0)
+    expect(dialogs).toBe(0)
+  })
+})
+
+test.describe('console controls', () => {
+  test('filters rows by level, with counts', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('a'); console.warn('w'); console.error('e'); console.log('b')" }))
+    await expect(page.locator('.console-filters button')).toHaveText(['All 4', 'Logs 2', 'Warnings 1', 'Errors 1'])
+    await filterButton(page, 'Warnings').click()
+    await expect(filterButton(page, 'Warnings')).toHaveAttribute('aria-pressed', 'true')
+    await expect(consoleRows(page).filter({ visible: true })).toHaveText(['w'])
+    await filterButton(page, 'All').click()
+    await expect(consoleRows(page).filter({ visible: true })).toHaveCount(4)
+  })
+
+  test('says when a filter hides everything', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('only a log')" }))
+    await filterButton(page, 'Errors').click()
+    await expect(page.locator('#console .console-empty')).toHaveText('Nothing to show for this filter')
+  })
+
+  test('Clear, Ctrl+L and console.clear() empty the logs but keep editor errors', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('x')", css: 'h1 { color: ' }))
+    const editorError = consoleRows(page).filter({ hasText: /^css Line 1:/ })
+    await expect(editorError).toHaveCount(1)
+    await page.locator('.console-clear').click()
+    await expect(consoleRows(page)).toHaveCount(1)
+    await expect(editorError).toHaveCount(1)
+
+    await page.locator('.editor-bar .run-button').click()
+    await expect(consoleRows(page).filter({ hasText: /^x$/ })).toHaveCount(1)
+    await page.locator('#console .console-log').focus()
+    await page.keyboard.press('Control+l')
+    await expect(consoleRows(page).filter({ hasText: /^x$/ })).toHaveCount(0)
+    await expect(editorError).toHaveCount(1)
+  })
+
+  test('console.clear() clears what came before it', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('gone'); console.clear(); console.log('kept')" }))
+    await expect(consoleRows(page)).toHaveText(['kept'])
+  })
+
+  test('console.table renders a table', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.table([{ name: 'Ada', year: 1815 }, { name: 'Alan', year: 1912 }])" }))
+    const grid = page.locator('#console table')
+    await expect(grid.locator('thead th')).toHaveText(['(index)', 'name', 'year'])
+    await expect(grid.locator('tbody tr').first().locator('th, td')).toHaveText(['0', 'Ada', '1815'])
+  })
+
+  test('keeps the newest 1000 rows and says how many older ones were removed', async ({ page }) => {
+    await openApp(page, shareLink({ js: "for (let i = 0; i < 3000; i++) console.log('row ' + i)" }))
+    await expect(filterButton(page, 'All')).toHaveText('All 3000')
+    await expect(consoleRows(page)).toHaveCount(1000)
+    await expect(consoleRows(page).first()).toHaveText('row 2000')
+    await expect(page.locator('#console .console-dropped')).toHaveText('2000 older messages removed')
+    await page.locator('.console-clear').click()
+    await expect(page.locator('#console .console-dropped')).toBeHidden()
+  })
+
+  test('keeps up with thousands of logs', async ({ page }) => {
+    await openApp(page, shareLink({ js: "for (let i = 0; i < 2000; i++) console.log('row ' + i)" }))
+    await expect(filterButton(page, 'All')).toHaveText('All 2000')
+    await expect(consoleRows(page).last()).toHaveText('row 1999')
+    await expect(consoleRows(page).last()).toBeInViewport()
+    await page.locator('#tab-css').click()
+    await expect(page.locator('#css-editor')).toBeVisible()
+  })
+})
+
+const promptRows = (page) => page.locator('#console .prompt-input, #console .prompt-result')
+
+async function runInConsole (page, code) {
+  await page.locator('.console-prompt .view-lines').click()
+  await page.keyboard.type(code)
+  await page.keyboard.press('Enter')
+}
+
+test.describe('console prompt on a slow page', () => {
+  let server
+  let port
+  test.beforeAll(async () => {
+    // A stylesheet that takes 1.5 s holds back the page's own scripts
+    server = http.createServer((req, res) => setTimeout(() => {
+      res.writeHead(200, { 'content-type': 'text/css', 'cache-control': 'no-store' })
+      res.end('p { color: rgb(1, 2, 3) }')
+    }, 1500))
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    port = server.address().port
+  })
+  test.afterAll(() => server.close())
+
+  test("an entry sent while the page loads runs after the page's own scripts", async ({ page }) => {
+    const html = `<link rel="stylesheet" href="http://127.0.0.1:${port}/slow.css"><p>x</p>`
+    await openApp(page, shareLink({ html, js: "const MESSAGE = 'hello'" }))
+    await page.locator('.editor-bar .run-button').click()
+    await runInConsole(page, 'MESSAGE')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['"hello"'])
+  })
+})
+
+test.describe('console prompt', () => {
+  test('runs code in the page and shows its value', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, '2 + 2')
+    await expect(promptRows(page)).toHaveText(['2 + 2', '4'])
+    await runInConsole(page, 'document.title')
+    await expect(promptRows(page).last()).toHaveText('"Preview"')
+  })
+
+  test('keeps let declarations between entries, and sees the page\'s variables', async ({ page }) => {
+    await openApp(page)
+    await runInConsole(page, 'let x = 1')
+    await runInConsole(page, 'x + 1')
+    await runInConsole(page, 'MESSAGE')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['undefined', '2', /^"greetings/])
+  })
+
+  test('supports await, multi-line entries and errors', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, 'await Promise.resolve(5)')
+    await expect(page.locator('#console .prompt-result').last()).toHaveText('5')
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.type('const a = 1')
+    await page.keyboard.press('Shift+Enter')
+    await page.keyboard.type('a + 1')
+    await page.keyboard.press('Enter')
+    await expect(page.locator('#console .prompt-result').last()).toHaveText('2')
+    await runInConsole(page, 'nope()')
+    await expect(consoleRows(page).last()).toHaveText('UncaughtReferenceError: nope is not defined')
+  })
+
+  test('stops a runaway loop typed at the prompt', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, 'while (true) {}')
+    await expect(consoleRows(page).filter({ hasText: 'Stopped a loop at Console line 1' })).toHaveCount(1)
+    await page.locator('#tab-css').click()
+    await expect(page.locator('#css-editor')).toBeVisible()
+  })
+
+  test('↑ recalls earlier entries, and a run clears the entries but not the history', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, '6 * 7')
+    await expect(promptRows(page)).toHaveText(['6 * 7', '42'])
+    await page.locator('.editor-bar .run-button').click()
+    await expect(promptRows(page)).toHaveCount(0)
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.press('ArrowUp')
+    await expect(page.locator('.console-prompt .view-lines')).toHaveText(/6\s\*\s7/)
+  })
+
+  test('an entry sent while the preview reloads still runs', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.type('1 + 1')
+    await page.locator('.editor-bar .run-button').click()
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['2'])
+  })
+
+  test('Ctrl+Enter in the prompt runs the preview and keeps the entry', async ({ page }) => {
+    await openApp(page, shareLink({ js: 'document.body.dataset.run = Math.random()' }))
+    const body = preview(page).locator('body')
+    await expect(body).toHaveAttribute('data-run', /\d/)
+    const first = await body.getAttribute('data-run')
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.type('draft')
+    await page.keyboard.press('Control+Enter')
+    await expect(body).not.toHaveAttribute('data-run', first)
+    await expect(page.locator('.console-prompt .view-lines')).toHaveText('draft')
+  })
+
+  test('the prompt\'s own syntax errors are not editor errors', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.type('let = ')
+    await page.waitForTimeout(2600) // editor errors refresh 1.5 s after a change
+    await expect(page.locator('.editor-tabs .error-dot:visible')).toHaveCount(0)
+    await expect(consoleRows(page).filter({ hasText: / Line \d+:/ })).toHaveCount(0)
+  })
+
+  test('works in the phone layout', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('.mobile-tabs [data-panel="console"]').click()
+    await runInConsole(page, '1 + 2')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['3'])
+  })
+})
+
 test.describe('run control', () => {
   const autoRun = (page) => page.locator('.editor-bar').getByRole('switch', { name: 'Auto-run' })
   const runButton = (page) => page.locator('.editor-bar').getByRole('button', { name: /^Run/ })
@@ -189,7 +448,7 @@ test.describe('run control', () => {
     await expect(preview(page).locator('body')).toHaveText('second')
 
     await page.reload()
-    await expect(page.locator('.monaco-editor')).toHaveCount(3)
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
     await expect(autoRun(page)).toHaveAttribute('aria-checked', 'false')
     await expect(preview(page).locator('body')).toHaveText('second')
     await expect(runButton(page)).not.toHaveAttribute('data-stale')
@@ -406,8 +665,7 @@ test.describe('examples', () => {
   test('an empty console says where output will appear', async ({ page }) => {
     await openBlank(page)
     await expect(consoleRows(page)).toHaveCount(0)
-    const hint = await page.locator('#console').evaluate(el => getComputedStyle(el, '::before').content)
-    expect(hint).toContain('Console output appears here')
+    await expect(page.locator('#console .console-empty')).toHaveText('Console output appears here')
   })
 
   test('Blank clears every editor and the preview', async ({ page }) => {
@@ -510,7 +768,7 @@ test.describe('resizable layout', () => {
     expect(wider).toBeGreaterThan(narrower + 250)
 
     await page.reload()
-    await expect(page.locator('.monaco-editor')).toHaveCount(3)
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
     expect(Math.abs((await editor.boundingBox()).width - wider)).toBeLessThan(4)
   })
 
@@ -543,7 +801,7 @@ test.describe('resizable layout', () => {
     expect(Math.round((await consolePane.boundingBox()).height)).toBe(288)
 
     await page.reload()
-    await expect(page.locator('.monaco-editor')).toHaveCount(3)
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
     expect(Math.round((await consolePane.boundingBox()).height)).toBe(288)
   })
 
@@ -612,7 +870,7 @@ test.describe('device preview', () => {
     }
 
     await page.reload()
-    await expect(page.locator('.monaco-editor')).toHaveCount(3)
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
     expect(Math.abs(await frameWidth(page) - width)).toBeLessThan(2)
   })
 
@@ -780,7 +1038,7 @@ test.describe('phone layout', () => {
     await openApp(page, shareLink({ js: "console.log('a long line ' + 'x'.repeat(200))" }))
     await page.locator('.mobile-tabs [data-panel="console"]').click()
     await expect(consoleRows(page)).toHaveCount(1)
-    expect(await page.locator('#console').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+    expect(await page.locator('#console .console-log').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
   })
 
   test('a console row flows as one paragraph, not side-by-side columns', async ({ page }) => {
@@ -903,7 +1161,7 @@ test.describe('toolbar', () => {
     await page.locator('#font-size-menu [data-value="18"]').click()
 
     await page.reload()
-    await expect(page.locator('.monaco-editor')).toHaveCount(3)
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
     await expect(page.locator('#js-editor .view-lines')).toHaveCSS('font-size', '18px')
   })

@@ -769,14 +769,6 @@ header {
   opacity: 1;
 }
 
-/* An empty console says what it is for */
-.console:not(:has(.error, .warn, .string-log))::before {
-  content: 'Console output appears here';
-  padding: 4px 6px;
-  color: var(--text-muted);
-  font: 700 12px var(--ui-font);
-}
-
 /* faded language-logo watermark behind each editor */
 .icons {
   width: 200px;
@@ -791,20 +783,91 @@ header {
 /* ============================================================
    Console
    ============================================================ */
+/* The console drawer: a header strip, the scrolling log, then (Task 4) the prompt */
 .console {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  align-items: stretch;
-  gap: 4px;
-  padding: 8px;
   background: var(--console-bg);
   color: var(--console-text);
   font-family: 'Cascadia Code', 'Consolas', monospace;
   font-size: 13px;
   letter-spacing: 0.3px;
-  overflow-x: auto;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.console-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font: 700 12px var(--ui-font);
+  letter-spacing: 0;
+}
+
+.console-title {
+  letter-spacing: 0.04em;
+}
+
+.console-filters {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.console-filter,
+.console-clear {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.console-filter:hover,
+.console-clear:hover {
+  color: var(--text);
+}
+
+.console-filter[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.console-count {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.console-clear {
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+}
+
+.console-clear svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.console-log {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  overflow: auto;
 }
 
 /* errors and logs are separate regions that still flow as one list */
@@ -812,11 +875,25 @@ header {
   display: contents;
 }
 
+.console-empty,
+.console-dropped {
+  margin: 0;
+  padding: 4px 6px;
+  color: var(--text-muted);
+  font: 700 12px var(--ui-font);
+}
+
+.console-log[data-filter='log'] [data-level]:not([data-level='log']),
+.console-log[data-filter='warn'] [data-level]:not([data-level='warn']),
+.console-log[data-filter='error'] [data-level]:not([data-level='error']) {
+  display: none;
+}
+
 .error,
 .warn,
 .string-log {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-width: max-content;
   width: 100%;
@@ -849,6 +926,145 @@ header {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+}
+
+/* Expandable values: a drawn disclosure triangle, then indented key: value lines */
+.value-tree {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.value-toggle {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.console .value-toggle svg {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: calc(0.6em - 4px);
+  fill: currentColor;
+  transition: transform 0.15s var(--ease);
+}
+
+.value-toggle[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+
+.value-children {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 2px 5px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+/* display: flex above would otherwise beat the hidden attribute */
+.value-children[hidden] {
+  display: none;
+}
+
+.value-line {
+  display: flex;
+  align-items: flex-start;
+  white-space: pre;
+}
+
+.value-key,
+.value-more {
+  color: var(--text-muted);
+}
+
+.value-text {
+  white-space: pre-wrap;
+}
+
+/* console.table */
+.console-table {
+  border-collapse: collapse;
+  font: inherit;
+  font-size: 12px;
+}
+
+.console-table th,
+.console-table td {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+  white-space: pre;
+}
+
+.console-table th {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.console-table thead th {
+  font-weight: 700;
+}
+
+/* Prompt entries (Task 4): the code you ran, then its value */
+.prompt-input,
+.prompt-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 10px 4px 13px;
+}
+
+.prompt-input {
+  color: var(--text-muted);
+  white-space: pre;
+}
+
+.prompt-input svg,
+.prompt-result svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  fill: var(--text-muted);
+}
+
+/* The prompt bar, docked under the log */
+.console-prompt {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 0 8px 0 12px;
+  border-top: 1px solid var(--border);
+}
+
+.console-prompt > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 8px;
+  fill: var(--accent);
+}
+
+.prompt-editor {
+  flex: 1;
+  min-width: 0;
+  height: 31px;
+}
+
+/* The prompt sits on the console's own background, not the editor theme's */
+.prompt-editor .monaco-editor {
+  --vscode-editor-background: var(--console-bg);
+  --vscode-editorGutter-background: var(--console-bg);
 }
 
 /* ============================================================
@@ -1010,13 +1226,20 @@ header {
     overflow-wrap: anywhere;
   }
 
-  .console .console-region span + span {
+  /* A row's own parts only; the value tree inside keeps its own spacing */
+  .console .console-region > div > span + span {
     margin-left: 8px;
   }
 
-  .console .console-region svg {
+  .console .console-region > div > svg {
     margin-right: 6px;
     vertical-align: -4px;
+  }
+
+  /* The tab bar already says Console; Clear keeps its name as an icon */
+  .console-title,
+  .console-clear-label {
+    display: none;
   }
 
   .mobile-tabs {

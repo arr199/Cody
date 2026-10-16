@@ -1,11 +1,13 @@
-import { monaco, createEditors, readCode, setFontSize } from './src/editors'
+import { monaco, createEditors, createPromptEditor, readCode, setFontSize } from './src/editors'
 import { encodeState, decodeState, hasCode } from './src/state/urlCodec'
 import { EXAMPLES, DEFAULT_EXAMPLE_ID, getExample } from './src/examples'
 import { buildDocument } from './src/preview/buildDocument'
-import { onConsoleMessage } from './src/preview/consoleBridge'
+import { onConsoleMessage, createPromptChannel } from './src/preview/consoleBridge'
+import { preparePromptCode } from './src/preview/promptCode'
 import { createPreviewFrame } from './src/preview/previewFrame'
 import { createRunner } from './src/preview/runner'
 import { createConsolePanel } from './src/console/consolePanel'
+import { connectPrompt } from './src/console/consolePrompt'
 import { loadPreferences, applyTheme, saveFontSize } from './src/ui/preferences'
 import { createMenu, closeMenusOnOutsideInteraction } from './src/ui/menus'
 import { createWorkspace } from './src/ui/workspace'
@@ -58,18 +60,30 @@ function bootstrap () {
 
   // CONSOLE
   const consolePanel = createConsolePanel($('#console'))
-  onConsoleMessage(() => preview.window, (type, args) => consolePanel.appendLog(type, args))
-  // A marker's model tells which editor it belongs to
-  const languageOf = (uri) => ['html', 'css', 'js']
-    .find(language => editors[language].getModel().uri.toString() === uri.toString())
+  const promptChannel = createPromptChannel(() => preview.window)
+  onConsoleMessage(() => preview.window, (message) => {
+    if (message.type === 'ready') promptChannel.open()
+    else consolePanel.receive(message)
+  })
+  // A marker's model tells which editor it belongs to. The console prompt is
+  // a Monaco editor too; its markers aren't editor errors.
+  const paneOf = new Map(['html', 'css', 'js'].map(language => [editors[language].getModel().uri.toString(), language]))
+  const languageOf = (uri) => paneOf.get(uri.toString())
   monaco.editor.onDidChangeMarkers(debounce(() => {
-    const markers = monaco.editor.getModelMarkers({})
+    const markers = monaco.editor.getModelMarkers({}).filter(marker => languageOf(marker.resource))
     consolePanel.setErrors(markers)
     const failing = markers.filter(marker => marker.severity === monaco.MarkerSeverity.Error)
     const failingLanguages = new Set(failing.map(marker => languageOf(marker.resource)))
     showTabErrors(editorTabs, failingLanguages)
     showTabErrors(panelTabs, failingLanguages)
   }, ERRORS_DELAY))
+
+  // CONSOLE PROMPT: entries run in the preview, rewritten by preparePromptCode
+  const promptEditor = createPromptEditor(consolePanel.promptContainer, preferences)
+  connectPrompt(promptEditor, (code) => {
+    consolePanel.appendInput(code)
+    promptChannel.send(preparePromptCode(code))
+  })
 
   // PREVIEW + SHARE URL
   // Always built from the app root, which also moves legacy path-based links
@@ -88,6 +102,7 @@ function bootstrap () {
   const runner = createRunner({
     run () {
       consolePanel.clearLogs()
+      promptChannel.reset()
       preview.render(buildDocument(readCode(editors)))
     },
     delays: RENDER_DELAY

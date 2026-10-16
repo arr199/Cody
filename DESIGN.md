@@ -421,7 +421,12 @@ An auto-run switch and a Run button, at the right end of the editor tab strip (b
 
 - **Rows:** mono 13px, 6px × 10px padding, 6px radius, a 3px left rule and a 10–12% tinted background in the severity color (green for logs, amber for warnings, coral for errors), with a leading 18px status icon.
 - **Layout:** errors and logs are separate regions that still flow as one list, with 4px between rows. On desktop, rows extend to their content width and scroll horizontally. On phones each row flows as one wrapping paragraph, with the icon inline and the logged values separated by 8px.
-- **Empty:** an empty console shows "Console output appears here" in Graphite Toolbar type.
+- **Empty:** an empty console shows "Console output appears here" in Graphite Toolbar type; when a filter hides every row it says "Nothing to show for this filter".
+- **Header strip:** about 30px with a hairline underneath, in Graphite Toolbar type: the "Console" label, the filters (All · Logs · Warnings · Errors) as a hairline-outlined segmented group whose pressed segment takes the Indigo Wash with a Chalk label, live counts in regular-weight tabular numerals, and Clear (a drawn icon and its word) pushed right. On phones the label drops (the tab bar says it) and Clear is icon-only.
+- **Values:** an expandable value is a button: a drawn 8px triangle that turns 90° when open, then its one-line summary. Opened, its `key: value` lines indent 12px behind a 1px Hairline guide, with Graphite keys; nested values open the same way. A row aligns to its first line, so an opened value grows downward from the icon.
+- **Tables:** `console.table` draws a compact grid: 1px Hairline cells, 3px × 10px padding, 12px mono, Graphite headers (bold in the head row) and index column.
+- **Prompt rows:** the code you ran shows in Graphite after a drawn `›`; its value follows after a drawn `←` in console text. Neither carries a severity rule or tint.
+- **Prompt bar:** docked under the log behind a hairline: a Workbench Indigo `›`, then a one-line Monaco editor (13px mono, no gutter) on the console's own background, growing to six lines. Its placeholder reads "Run JavaScript in the preview".
 
 ### Phone tab bar
 

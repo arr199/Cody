@@ -31,7 +31,7 @@ The preview's sandboxing is a property of the product, but it's not something to
 
 ## Capabilities and Constraints
 
-- Three Monaco editors (HTML, CSS, JS) with Emmet. A live preview in a sandboxed iframe, without same-origin access. A console panel showing logs, warnings, uncaught errors and editor errors. A tabbed editor beside a resizable preview (device presets, free width, fullscreen, open in a new tab), with a console drawer below. Code runs as you type, or on Run / Ctrl+Enter with auto-run off, and runaway loops are stopped and reported; on phones, a bottom tab bar shows one panel at a time. Editor themes and font size persist.
+- Three Monaco editors (HTML, CSS, JS) with Emmet. A live preview in a sandboxed iframe, without same-origin access. A console panel with expandable values, filters, tables and a prompt that runs code in the preview, showing logs, warnings, uncaught errors and editor errors. A tabbed editor beside a resizable preview (device presets, free width, fullscreen, open in a new tab), with a console drawer below. Code runs as you type, or on Run / Ctrl+Enter with auto-run off, and runaway loops are stopped and reported; on phones, a bottom tab bar shows one panel at a time. Editor themes and font size persist.
 - Planned work, in order:
   1. starter examples
   2. layout: mobile-friendly app, resizable panels, device preview

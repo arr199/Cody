@@ -10,7 +10,7 @@ A playground to test your JavaScript, CSS, and HTML skills.
 
 - **Coding in JS, CSS, and HTML** -  Users can write and edit their JavaScript, CSS, and HTML code all in one place.
 - **Live Website Preview**  -  See your website come to life in real time, making it easy to test and refine your design.
-- **Console Interaction** - The console is right there, ready to display error messages, logs, and responses, helping you perfect your code.
+- **Interactive Console** - Expand logged objects, filter by logs, warnings or errors, render `console.table`, and run JavaScript inside your page from the prompt.
 - **Customization** -  You can change the theme and font size to match your preferences, ensuring a comfortable and visually appealing environment.
 - **Flexible Workspace** - A tabbed editor beside the live preview, with a console drawer below. Drag the handles to resize; Cody remembers your layout.
 - **Device Preview** - Check your page at phone, tablet or any custom width, view it fullscreen, or open it in its own tab.

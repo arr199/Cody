@@ -63,3 +63,48 @@ export function readCode (editors) {
 export function setFontSize (editors, fontSize) {
   editors.all.forEach(editor => editor.updateOptions({ fontSize }))
 }
+
+const promptOptions = {
+  value: '',
+  language: 'javascript',
+  automaticLayout: true,
+  fontFamily: editorOptions.fontFamily,
+  fontSize: 13,
+  lineNumbers: 'off',
+  glyphMargin: false,
+  folding: false,
+  lineDecorationsWidth: 0,
+  lineNumbersMinChars: 0,
+  renderLineHighlight: 'none',
+  overviewRulerLanes: 0,
+  overviewRulerBorder: false,
+  hideCursorInOverviewRuler: true,
+  minimap: { enabled: false },
+  stickyScroll: { enabled: false },
+  scrollBeyondLastLine: false,
+  wordWrap: 'on',
+  // The prompt is short; let suggestions overflow it instead of clipping
+  fixedOverflowWidgets: true,
+  // Enter runs the entry, as in DevTools; Tab accepts a completion
+  acceptSuggestionOnEnter: 'off',
+  padding: { top: 6, bottom: 6 },
+  scrollbar: { horizontal: 'hidden', alwaysConsumeMouseWheel: false },
+  placeholder: 'Run JavaScript in the preview',
+  ariaLabel: 'Console prompt: JavaScript to run in the preview'
+}
+
+const PROMPT_MAX_LINES = 6
+
+// The console's prompt: one line that grows with its content up to six
+// lines, then scrolls. createEditors() must run first (it sets up workers).
+export function createPromptEditor (container, { theme }) {
+  const editor = monaco.editor.create(container, { ...promptOptions, theme })
+  const fit = () => {
+    const lineHeight = editor.getOption(monaco.editor.EditorOption.lineHeight)
+    const padding = promptOptions.padding.top + promptOptions.padding.bottom
+    container.style.height = `${Math.min(editor.getContentHeight(), lineHeight * PROMPT_MAX_LINES + padding)}px`
+  }
+  editor.onDidContentSizeChange(fit)
+  fit()
+  return editor
+}
