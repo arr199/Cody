@@ -318,7 +318,7 @@ Dropdowns hang 6px below their rail button and match its width. The exception is
 
 - The body becomes a column. The rail turns into a compact top bar: the wordmark on the left, then four 40px square icon buttons with 18px icons. Their labels are visually hidden but stay as the accessible names. The bar uses a 6px gap and 6px × 10px padding, with a hairline underneath.
 - Every menu, including Examples, opens fixed and full width under the bar (60px from the top, 8px from each edge).
-- The workspace shows one panel at a time above a bottom tab bar (HTML · CSS · JS · Preview · Console), with 8px padding and an 8px gap. The app opens on Preview.
+- The workspace shows one panel at a time above a bottom tab bar (HTML · CSS · JS · Preview · Console), with 8px padding and an 8px gap. Linked code opens on Preview, empty editors on JS. In the Console view the bar shows only JS · Console, and the editor bar (view toggle, Auto, Run) shows above the editor.
 - The handles, the editor tab strip, the presets and the readout are hidden, because the phone is the device. The device toolbar keeps Fullscreen and Open in new tab, and leads with the run controls. Below 420px the auto-run switch drops its word to keep the bar on one row.
 
 The spacing rhythm is 4 / 6 / 8 / 10 / 12 / 18px:

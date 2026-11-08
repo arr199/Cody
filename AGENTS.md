@@ -53,6 +53,8 @@ pnpm test:api  # API tests against the local test database
 
 Run `pnpm lint`, `pnpm test`, `pnpm test:api` and `pnpm test:e2e` (which also builds) before reporting work as done. The last two need `docker compose up -d`.
 
+CI (`.github/workflows/ci.yml`) runs the same four commands, with the same `docker compose` database, on every push and pull request to `main`.
+
 ## Layout
 
 - `index.html`: app shell (the rail, the `#workspace` grid with the editor, preview and console panes, and the phone tab bar), plus an inline script that applies the saved theme before paint.
