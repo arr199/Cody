@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,700&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
-  <title>Cody-Studio</title>
+  <title>Cody Studio</title>
   <!-- Apply saved theme before paint to avoid a flash. Keep in sync with src/ui/preferences.js -->
   <script>
     (function () {
@@ -31,11 +31,8 @@
     <nav class="left-navbar">
       <!-- BRAND -->
       <div class="config-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" class="bi bi-gear" viewBox="0 0 16 16">
-            <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
-            <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
-          </svg>
-          <span>Cody</span>
+          <img class="brand-logo" src="/images/favicon_io/android-chrome-192x192.png" alt="" width="24" height="24">
+          <span>Cody Studio</span>
       </div>
 
       <!-- EXAMPLES (options are rendered from src/examples) -->
@@ -81,18 +78,18 @@
           <button type="button" data-value="hc-light">High Contrast Light</button>
         </div>
       </div>
-      <!-- COPY URL -->
-      <div id="copy-url-button-container" class="btn-containers">
-        <button id="copy-url-button" class="left-navbar-buttons">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-copy" viewBox="0 0 16 16">
-            <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2Zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6ZM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2Z"/>
+      <!-- SHARE: saves the code and copies a short /s/ link -->
+      <div id="share-button-container" class="btn-containers">
+        <button id="share-button" class="left-navbar-buttons">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-share" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5m-8.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m11 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3"/>
           </svg>
-          <span class="button-label">Copy URL</span>
+          <span class="button-label">Share</span>
         </button>
       </div>
     </nav>
   </header>
-  <main id="workspace" class="workspace" data-language="js" data-panel="preview">
+  <main id="workspace" class="workspace" data-view="web" data-language="js" data-panel="editor">
     <section class="pane editor-pane" aria-label="Code editors">
       <!-- Run controls sit beside the tabs, not inside the tablist (ARIA allows only tabs there).
            On phones a second copy lives in the preview toolbar; both follow one runner. -->
@@ -101,6 +98,10 @@
           <button type="button" role="tab" id="tab-html" data-language="html" aria-controls="html-editor" aria-selected="false" tabindex="-1">HTML<span class="error-dot" hidden></span></button>
           <button type="button" role="tab" id="tab-css" data-language="css" aria-controls="css-editor" aria-selected="false" tabindex="-1">CSS<span class="error-dot" hidden></span></button>
           <button type="button" role="tab" id="tab-js" data-language="js" aria-controls="js-editor" aria-selected="true" tabindex="0">JS<span class="error-dot" hidden></span></button>
+        </div>
+        <div class="view-toggle" role="group" aria-label="View">
+          <button type="button" data-view="web" aria-pressed="true" title="HTML, CSS and JS with a live preview">Web</button>
+          <button type="button" data-view="js" aria-pressed="false" title="Only JavaScript and the console">Console</button>
         </div>
         <div class="run-controls">
           <button type="button" class="auto-run" role="switch" aria-checked="true" aria-label="Auto-run" title="Run the code as you type">
@@ -161,14 +162,16 @@
       <button type="button" role="tab" data-language="html" aria-controls="html-editor" aria-selected="false" tabindex="-1">HTML<span class="error-dot" hidden></span></button>
       <button type="button" role="tab" data-language="css" aria-controls="css-editor" aria-selected="false" tabindex="-1">CSS<span class="error-dot" hidden></span></button>
       <button type="button" role="tab" data-language="js" aria-controls="js-editor" aria-selected="false" tabindex="-1">JS<span class="error-dot" hidden></span></button>
-      <button type="button" role="tab" data-panel="preview" aria-controls="page" aria-selected="true" tabindex="0">Preview</button>
+      <button type="button" role="tab" data-panel="preview" aria-controls="page" aria-selected="false" tabindex="-1">Preview</button>
       <button type="button" role="tab" data-panel="console" aria-controls="console" aria-selected="false" tabindex="-1">Console</button>
     </nav>
   </main>
 
-  <!-- COPY URL / OPEN TAB POP UP -->
-  <div id="url-copy-container" class="url-copy-container" role="status" aria-live="polite">
-    <span>URL Copied to Clipboard</span>
+  <!-- SHARE / OPEN TAB POP UP -->
+  <div id="url-copy-container" class="url-copy-container" role="status" aria-live="polite" data-tone="ok">
+    <svg class="toast-icon toast-icon-ok" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor"><path d="m424-296 282-282-56-56-226 226-114-114-56 56 170 170Zm56 216q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
+    <svg class="toast-icon toast-icon-warn" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor"><path d="M480-280q17 0 28.5-11.5T520-320q0-17-11.5-28.5T480-360q-17 0-28.5 11.5T440-320q0 17 11.5 28.5T480-280Zm-40-160h80v-240h-80v240Zm40 360q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
+    <span class="toast-text">Link copied</span>
   </div>
 
   <script type="module" src="/main.js">

@@ -76,7 +76,7 @@ export const EXAMPLES = [
 ]
 
 // Shown on a first visit, when the link carries no code
-export const DEFAULT_EXAMPLE_ID = 'welcome'
+export const DEFAULT_EXAMPLE_ID = 'blank'
 
 export function getExample (id) {
   return EXAMPLES.find(example => example.id === id)

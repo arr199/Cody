@@ -33,5 +33,9 @@ playwright-report
 
 # Superpowers plan-execution workspaces (ledgers, briefs)
 .superpowers/
+docs/superpowers/
 
 /.impeccable
+# Local secrets and the Vercel CLI link
+.env
+.vercel

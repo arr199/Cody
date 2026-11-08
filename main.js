@@ -11,10 +11,12 @@ import { connectPrompt } from './src/console/consolePrompt'
 import { loadPreferences, applyTheme, saveFontSize } from './src/ui/preferences'
 import { createMenu, closeMenusOnOutsideInteraction } from './src/ui/menus'
 import { createWorkspace } from './src/ui/workspace'
+import { storedView, viewFor, connectViewToggle } from './src/ui/viewToggle'
 import { connectTabs, showTabErrors } from './src/ui/tabs'
 import { setupLayoutHandles } from './src/ui/layout'
 import { setupDeviceToolbar } from './src/preview/deviceToolbar'
-import { setupCopyUrl } from './src/ui/copyUrl'
+import { setupShare } from './src/ui/share'
+import { sharedSnippetId, isSharedPath, fetchSnippet } from './src/share/snippetClient'
 import { createToast } from './src/ui/toast'
 import { setupOpenInTab } from './src/preview/openInTab'
 import { renderExamplesMenu } from './src/ui/examplesMenu'
@@ -32,8 +34,10 @@ function bootstrap () {
   const $ = (selector) => document.querySelector(selector)
   const preview = createPreviewFrame($('#page'))
 
-  // WORKSPACE: which editor (and, on phones, which panel) is showing
-  const workspace = createWorkspace($('#workspace'))
+  // WORKSPACE: which view, editor (and, on phones, which panel) is showing
+  const workspace = createWorkspace($('#workspace'), { view: storedView(), language: 'js', panel: 'editor' })
+  connectViewToggle($('.view-toggle'), workspace)
+  workspace.subscribe(({ view }) => { $('.preview-pane').inert = view === 'js' })
   const editorTabs = $('.editor-tabs')
   connectTabs(editorTabs, workspace, (tab, state) => tab.dataset.language === state.language)
   const panelTabs = $('.mobile-tabs')
@@ -116,7 +120,7 @@ function bootstrap () {
   // Loaded code always runs, even with auto-run off. setValue fires change
   // events synchronously; `loading` keeps them from counting as edits.
   function loadCode (code) {
-    workspace.select({ language: 'js', panel: workspace.state.panel }) // loaded code opens on JS
+    workspace.select({ view: viewFor(code, workspace.state.view), language: 'js', panel: workspace.state.panel })
     loading = true
     editors.html.setValue(code.html)
     editors.css.setValue(code.css)
@@ -134,9 +138,31 @@ function bootstrap () {
     })
   }
 
-  // A link without code opens the welcome example
-  const linkedCode = decodeState(window.location)
-  loadCode(hasCode(linkedCode) ? linkedCode : getExample(DEFAULT_EXAMPLE_ID))
+  const toast = createToast($('#url-copy-container'))
+
+  // Phones open linked code on its preview, and empty editors on the JS editor
+  function openCode (code) {
+    workspace.select({ panel: hasCode(code) ? 'preview' : 'editor' })
+    loadCode(code)
+  }
+
+  const snippetId = sharedSnippetId(window.location.pathname)
+  if (isSharedPath(window.location.pathname)) {
+    const lookup = snippetId ? fetchSnippet(snippetId) : Promise.resolve(null)
+    lookup
+      .then(code => {
+        if (code) return openCode(code)
+        toast.show("That shared link doesn't exist")
+        openCode(getExample(DEFAULT_EXAMPLE_ID))
+      }, error => {
+        console.error(error)
+        toast.show("Couldn't load the shared code")
+        openCode(getExample(DEFAULT_EXAMPLE_ID))
+      })
+  } else {
+    const linkedCode = decodeState(window.location)
+    openCode(hasCode(linkedCode) ? linkedCode : getExample(DEFAULT_EXAMPLE_ID))
+  }
   // Opening another share link in the same tab only changes the hash, which
   // doesn't reload the page. (replaceState in saveUrl() doesn't fire this.)
   window.addEventListener('hashchange', () => loadCode(decodeState(window.location)))
@@ -163,8 +189,7 @@ function bootstrap () {
   const themeMenu = createMenu($('#theme-button'), $('#theme-menu'), applyTheme)
   closeMenusOnOutsideInteraction([examplesMenu, fontSizeMenu, themeMenu])
 
-  const toast = createToast($('#url-copy-container'))
-  setupCopyUrl($('#copy-url-button'), toast)
+  setupShare($('#share-button'), toast, () => readCode(editors))
   setupOpenInTab($('#open-tab-button'), () => readCode(editors), toast)
 }
 

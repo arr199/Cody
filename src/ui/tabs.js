@@ -12,13 +12,14 @@ export function connectTabs (tablist, workspace, isSelected) {
   })
 
   tablist.addEventListener('keydown', (event) => {
-    const index = tabs.indexOf(document.activeElement)
+    const shown = tabs.filter(tab => tab.getClientRects().length > 0)
+    const index = shown.indexOf(document.activeElement)
     if (index === -1) return
     const target = {
-      ArrowRight: tabs[(index + 1) % tabs.length],
-      ArrowLeft: tabs[(index - 1 + tabs.length) % tabs.length],
-      Home: tabs[0],
-      End: tabs[tabs.length - 1]
+      ArrowRight: shown[(index + 1) % shown.length],
+      ArrowLeft: shown[(index - 1 + shown.length) % shown.length],
+      Home: shown[0],
+      End: shown[shown.length - 1]
     }[event.key]
     if (!target) return
     event.preventDefault()

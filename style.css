@@ -135,14 +135,15 @@ header {
   color: var(--text);
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 19px;
-  letter-spacing: 0.5px;
+  font-size: 18px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
-.config-icon svg {
-  fill: var(--accent);
-  width: 22px;
-  height: 22px;
+.brand-logo {
+  flex: none;
+  width: 24px;
+  height: 24px;
 }
 
 .left-navbar-buttons {
@@ -369,7 +370,7 @@ header {
   min-width: 0;
   height: 100%;
   display: grid;
-  grid-template-columns: minmax(280px, var(--split)) 12px minmax(240px, 1fr);
+  grid-template-columns: minmax(380px, var(--split)) 12px minmax(240px, 1fr);
   grid-template-rows: minmax(0, 1fr) 12px var(--console);
   grid-template-areas:
     "editor split preview"
@@ -604,6 +605,68 @@ header {
   border-color: var(--accent);
 }
 
+/* VIEW TOGGLE: the web view, or only JS beside the console */
+.view-toggle {
+  flex: none;
+  display: flex;
+  margin-left: auto;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.view-toggle button {
+  padding: 4px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.view-toggle button:hover {
+  color: var(--text);
+}
+
+.view-toggle button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.editor-bar .view-toggle + .run-controls {
+  margin-left: 0;
+}
+
+.workspace[data-view='js'] :is(.handle-console, [role='tab']:is([data-language='html'], [data-language='css'], [data-panel='preview'])) {
+  display: none;
+}
+
+/* The JS view keeps the preview running out of sight. Chrome deprioritizes a
+   display: none frame, which slows down heavy logging. */
+#workspace[data-view='js'] .preview-pane {
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 901px) {
+  .workspace[data-view='js'] {
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "editor split console";
+  }
+}
+
 /* The phone copy in the preview toolbar shows only in the phone layout */
 .device-toolbar .run-controls {
   display: none;
@@ -614,9 +677,13 @@ header {
   container-type: inline-size;
 }
 
-@container (max-width: 360px) {
+@container (max-width: 440px) {
   .editor-tabs [role='tab'] {
-    padding-inline: 10px;
+    padding-inline: 8px;
+  }
+
+  .view-toggle button {
+    padding-inline: 6px;
   }
 
   .auto-run-label {
@@ -1068,27 +1135,59 @@ header {
 }
 
 /* ============================================================
-   Toast (copy URL)
+   Toast
    ============================================================ */
 .url-copy-container {
   display: none;
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 240px;
-  height: 48px;
-  background: var(--accent-deep);
-  color: var(--accent-contrast);
-  font-weight: 700;
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px 10px 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  place-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
   z-index: 40;
-  animation: append-animate 0.18s var(--ease);
+  animation: toast-in 0.2s var(--ease);
 }
 
 .url-copy-container.visible {
-  display: grid;
+  display: flex;
+}
+
+.toast-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.toast-icon-ok {
+  color: var(--log-ok);
+}
+
+.toast-icon-warn {
+  color: var(--log-warn);
+}
+
+.url-copy-container[data-tone="ok"] .toast-icon-warn,
+.url-copy-container[data-tone="warn"] .toast-icon-ok {
+  display: none;
+}
+
+@keyframes toast-in {
+  from {
+    transform: translate(-50%, 8px);
+    opacity: 0;
+  }
 }
 
 /* ============================================================
@@ -1198,7 +1297,7 @@ header {
   .workspace[data-panel='preview'] :is(.editor-pane, .console),
   .workspace[data-panel='console'] :is(.editor-pane, .preview-pane),
   .handle,
-  .editor-bar,
+  .editor-tabs,
   .device-presets,
   .frame-readout {
     display: none;
@@ -1240,6 +1339,10 @@ header {
   .console-title,
   .console-clear-label {
     display: none;
+  }
+
+  .url-copy-container {
+    bottom: 76px; /* above the tab bar */
   }
 
   .mobile-tabs {

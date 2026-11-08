@@ -2,12 +2,9 @@ import http from 'node:http'
 import { test, expect } from '@playwright/test'
 import { encode, decode } from 'js-base64'
 
-// End-to-end tests against the real app in a real browser. The only thing
-// faked is the third-party link shortener, so tests never write to its database.
-
-const SHORTENER = '**/simple-api-server-production.up.railway.app/**'
-const SHORT_LINK = 'https://short.example/abc'
-
+// End-to-end tests against the real app, its real API and a local database
+// (docker compose up -d), in a real browser. The only thing faked is the
+// third-party package CDN (test/e2e/fakePackageCdn.js).
 // Builds a share link the same way the app does: html|js|css, URL-safe base64
 const shareLink = ({ html = '', js = '', css = '' }) =>
   `/#${[html, js, css].map(part => encode(part, true)).join('|')}`
@@ -48,20 +45,10 @@ async function chooseExample (page, id) {
   await exampleOption(page, id).click()
 }
 
-// The app opens on the welcome example; tests that need empty editors start here
+// A first visit opens empty editors
 async function openBlank (page) {
   await openApp(page)
-  await chooseExample(page, 'blank')
   await expect(page).toHaveURL(/\/$/)
-}
-
-async function mockShortener (page, behavior) {
-  await page.route(SHORTENER, route => {
-    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }
-    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
-    if (behavior === 'fail') return route.abort()
-    return route.fulfill({ status: 200, headers: cors, json: { status: 'ok', link: SHORT_LINK } })
-  })
 }
 
 test.describe('preview and console', () => {
@@ -125,7 +112,7 @@ test.describe('preview and console', () => {
   })
 
   test('shows editor errors without wiping the logs', async ({ page }) => {
-    await openApp(page, shareLink({ js: "console.log('kept')" }))
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('kept')" }))
     await expect(consoleRows(page)).toHaveText(['kept'])
 
     await focusEditorEnd(page, '#css-editor')
@@ -264,7 +251,7 @@ test.describe('console controls', () => {
   })
 
   test('keeps up with thousands of logs', async ({ page }) => {
-    await openApp(page, shareLink({ js: "for (let i = 0; i < 2000; i++) console.log('row ' + i)" }))
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "for (let i = 0; i < 2000; i++) console.log('row ' + i)" }))
     await expect(filterButton(page, 'All')).toHaveText('All 2000')
     await expect(consoleRows(page).last()).toHaveText('row 1999')
     await expect(consoleRows(page).last()).toBeInViewport()
@@ -314,7 +301,7 @@ test.describe('console prompt', () => {
   })
 
   test('keeps let declarations between entries, and sees the page\'s variables', async ({ page }) => {
-    await openApp(page)
+    await openApp(page, shareLink({ js: "const MESSAGE = 'greetings'" }))
     await runInConsole(page, 'let x = 1')
     await runInConsole(page, 'x + 1')
     await runInConsole(page, 'MESSAGE')
@@ -561,7 +548,7 @@ test.describe('run control', () => {
 test.describe('loop guard', () => {
   test('stops an infinite loop in the JS pane and runs the rest of the script', async ({ page }) => {
     const js = "console.log('before')\nwhile (true) {}\ndocument.body.append('after the loop')"
-    await openApp(page, shareLink({ js }))
+    await openApp(page, shareLink({ html: ' ', js }))
 
     await expect(preview(page).locator('body')).toHaveText('after the loop')
     const stopped = consoleRows(page).filter({ hasText: 'Stopped a loop at JS line 2 after 1 s. It may be infinite.' })
@@ -636,11 +623,12 @@ test.describe('editors', () => {
 })
 
 test.describe('examples', () => {
-  test('opens on the welcome example, which answers in the console', async ({ page }) => {
+  test('the welcome example answers in the console', async ({ page }) => {
     // The logo never stops riding its wave, so a click could never land on a
     // still target. Reduced motion stills it, and is worth covering anyway.
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await openApp(page)
+    await chooseExample(page, 'welcome')
     // Without motion the whole message is printed, wrapped, and fully on screen
     const scroller = preview(page).locator('.scroller')
     await expect(scroller).toContainText('edit MESSAGE in the js')
@@ -661,6 +649,7 @@ test.describe('examples', () => {
 
   test('scrolls whatever MESSAGE the welcome JS sets', async ({ page }) => {
     await openApp(page)
+    await chooseExample(page, 'welcome')
     await expect(preview(page).locator('.logo .letter')).toHaveCount(4)
     const [html, js, css] = new URL(page.url()).hash.slice(1).split('|').map(part => decode(part))
     const edited = js.replace(/const MESSAGE = '[^']*'/, "const MESSAGE = 'hello from the test'")
@@ -782,6 +771,84 @@ test.describe('examples', () => {
   })
 })
 
+test.describe('views', () => {
+  const viewButton = (page, name) => page.locator('.view-toggle').getByRole('button', { name })
+  // The preview keeps running in the Console view, just out of sight and out of reach
+  async function expectPreviewOutOfSight (page) {
+    const pane = page.locator('.preview-pane')
+    await expect(pane).toHaveAttribute('inert')
+    await expect.poll(async () => (await pane.boundingBox()).width).toBeLessThanOrEqual(1)
+  }
+
+  test('a first visit opens empty editors in the web view', async ({ page }) => {
+    await openApp(page)
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.locator('#js-editor')).toBeVisible()
+    await expect(page.locator('#page')).toBeVisible()
+    await expect(viewButton(page, 'Web')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('the Console view shows only JS beside a full-height console, and still runs it', async ({ page }) => {
+    await openBlank(page)
+    await viewButton(page, 'Console').click()
+    await expect(viewButton(page, 'Console')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.locator('#tab-html')).toBeHidden()
+    await expect(page.locator('#tab-css')).toBeHidden()
+    await expectPreviewOutOfSight(page)
+
+    const editor = await page.locator('.editor-pane').boundingBox()
+    const consolePane = await page.locator('#console').boundingBox()
+    expect(consolePane.x).toBeGreaterThan(editor.x + editor.width)
+    expect(Math.abs(consolePane.height - editor.height)).toBeLessThanOrEqual(1)
+
+    await focusEditorEnd(page, '#js-editor')
+    await page.keyboard.type("console.log([1, 2].map(n => n * 2).join(','))")
+    await expect(consoleRows(page)).toHaveText(['2,4'])
+  })
+
+  test('the tab keys skip the tabs the Console view hides', async ({ page }) => {
+    await openBlank(page)
+    await viewButton(page, 'Console').click()
+    await page.locator('#tab-js').focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('#tab-js')).toBeFocused()
+    await expect(page.locator('#js-editor')).toBeVisible()
+  })
+
+  test('a JS-only link opens in the Console view, a link with markup in the web view', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('only js')" }))
+    await expect(viewButton(page, 'Console')).toHaveAttribute('aria-pressed', 'true')
+    await expect(consoleRows(page)).toHaveText(['only js'])
+    await expectPreviewOutOfSight(page)
+
+    await chooseExample(page, 'canvas')
+    await expect(viewButton(page, 'Web')).toHaveAttribute('aria-pressed', 'true')
+    await expect(preview(page).locator('canvas')).toHaveCount(1)
+  })
+
+  test('the chosen view is remembered', async ({ page }) => {
+    await openBlank(page)
+    await viewButton(page, 'Console').click()
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toHaveCount(4)
+    await expect(viewButton(page, 'Console')).toHaveAttribute('aria-pressed', 'true')
+    await expectPreviewOutOfSight(page)
+  })
+
+  test('on phones the Console view has only the JS and Console tabs', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openApp(page, shareLink({ js: "console.log('phone js')" }))
+    await expect(page.locator('#js-editor')).toBeVisible()
+    await expect(page.locator('.mobile-tabs [role="tab"]:visible')).toHaveText(['JS', 'Console'])
+    await page.locator('.mobile-tabs [data-panel="console"]').click()
+    await expect(consoleRows(page)).toHaveText(['phone js'])
+
+    await page.locator('.mobile-tabs [data-language="js"]').click()
+    await viewButton(page, 'Web').click()
+    await expect(page.locator('.mobile-tabs [role="tab"]:visible')).toHaveText(['HTML', 'CSS', 'JS', 'Preview', 'Console'])
+  })
+})
+
 test.describe('tabbed editor', () => {
   test('tabs switch between the three editors', async ({ page }) => {
     await openApp(page, shareLink({ html: '<p>hello</p>', css: 'p { color: red }', js: "console.log('j')" }))
@@ -796,7 +863,7 @@ test.describe('tabbed editor', () => {
   })
 
   test('tabs work from the keyboard', async ({ page }) => {
-    await openApp(page, shareLink({ js: "console.log('j')" }))
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('j')" }))
     await page.locator('#tab-js').focus()
     await page.keyboard.press('ArrowRight') // wraps around to HTML
     await expect(page.locator('#tab-html')).toBeFocused()
@@ -813,7 +880,7 @@ test.describe('tabbed editor', () => {
   })
 
   test('loading code opens the JS tab', async ({ page }) => {
-    await openApp(page, shareLink({ js: "console.log('mine')" }))
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('mine')" }))
     await page.locator('#tab-css').click()
     await chooseExample(page, 'canvas')
     await expect(page.locator('#tab-js')).toHaveAttribute('aria-selected', 'true')
@@ -874,7 +941,7 @@ test.describe('resizable layout', () => {
   })
 
   test('the console drawer resizes and is remembered', async ({ page }) => {
-    await openApp(page, shareLink({ js: "console.log('x')" }))
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('x')" }))
     const handle = page.locator('.handle-console')
     const consolePane = page.locator('#console')
     expect(Math.round((await consolePane.boundingBox()).height)).toBe(160)
@@ -901,7 +968,7 @@ test.describe('resizable layout', () => {
   })
 
   test('re-clamps the console when the window shrinks', async ({ page }) => {
-    await openApp(page, shareLink({ js: "console.log('x')" }))
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('x')" }))
     const handle = page.locator('.handle-console')
     await handle.focus()
     await page.keyboard.press('End') // as tall as allowed: 70% of the workspace
@@ -1014,7 +1081,7 @@ test.describe('device preview', () => {
       page.locator('#open-tab-button').click()
     ])
     await expect(tab).toHaveURL(/\/preview\.html#.+/)
-    await expect(tab).toHaveTitle('Cody preview')
+    await expect(tab).toHaveTitle('Cody Studio preview')
     await expect(tab.frameLocator('#page').locator('body')).toHaveText('blocked:SecurityError')
     expect(await tab.evaluate(() => window.opener)).toBeNull()
   })
@@ -1083,8 +1150,14 @@ test.describe('device preview', () => {
 test.describe('phone layout', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('opens on the preview, with the tab bar and no handles', async ({ page }) => {
+  test('opens empty editors on the JS editor', async ({ page }) => {
     await openApp(page)
+    await expect(page.locator('#js-editor')).toBeVisible()
+    await expect(page.locator('.mobile-tabs [data-language="js"]')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('opens linked code on the preview, with the tab bar and no handles', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>hi</p>' }))
     await expect(page.locator('#page')).toBeVisible()
     await expect(page.locator('.editor-pane')).toBeHidden()
     await expect(page.locator('.mobile-tabs')).toBeVisible()
@@ -1140,7 +1213,7 @@ test.describe('phone layout', () => {
   })
 
   test('choosing an example keeps the current panel', async ({ page }) => {
-    await openApp(page)
+    await openApp(page, shareLink({ html: '<p>hi</p>' }))
     await chooseExample(page, 'canvas')
     await expect(page.frameLocator('#page').locator('canvas')).toHaveCount(1)
     await expect(page.locator('#page')).toBeVisible()
@@ -1178,28 +1251,106 @@ test.describe('share links', () => {
   })
 })
 
-// Both tests use the operating system's clipboard, which parallel tests would share
-test.describe('copy URL', () => {
+// Share saves the code through the app's real API (scripts/test-server.js and
+// the local Docker database). These tests share the operating system's
+// clipboard, so they run one at a time.
+test.describe('share', () => {
   test.describe.configure({ mode: 'serial' })
-
-  test('copies the shortened link', async ({ page, context }) => {
+  test.beforeEach(async ({ context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
-    await mockShortener(page, 'ok')
-    await openApp(page, shareLink({ js: "console.log('share me')" }))
+  })
+  // Each test starts from an empty clipboard, so a stale link can't pass for a new one
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await page.evaluate(() => navigator.clipboard.writeText(''))
+  })
+  const clipboard = (page) => page.evaluate(() => navigator.clipboard.readText())
 
-    await page.locator('#copy-url-button').click()
-    await expect(page.locator('#url-copy-container')).toHaveText('URL Copied to Clipboard')
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(SHORT_LINK)
+  test('copies a short /s/ link that opens the same code', async ({ page, context }) => {
+    const js = `console.log('shared ${Date.now()}')`
+    await openApp(page, shareLink({ js }))
+    await page.locator('#share-button').click()
+    await expect.poll(() => clipboard(page)).toMatch(/^http:\/\/localhost:4179\/s\/[0-9A-Za-z]{8}$/)
+    await expect(page.locator('#url-copy-container')).toHaveText('Link copied')
+    const link = await clipboard(page)
+
+    const other = await context.newPage()
+    await openApp(other, link.replace('http://localhost:4179', ''))
+    await expect(consoleRows(other)).toHaveText([js.slice(13, -2)])
+    await expect(other).toHaveURL(/\/#.+/)
   })
 
-  test('copies the full link when the shortener fails', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
-    await mockShortener(page, 'fail')
-    await openApp(page, shareLink({ js: "console.log('share me')" }))
+  test('the same code gives the same link', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>twice</p>' }))
+    await page.locator('#share-button').click()
+    await expect.poll(() => clipboard(page)).toMatch(/\/s\//)
+    const first = await clipboard(page)
+    await page.evaluate(() => navigator.clipboard.writeText(''))
+    await page.locator('#share-button').click()
+    await expect.poll(() => clipboard(page)).toBe(first)
+  })
 
-    await page.locator('#copy-url-button').click()
-    await expect(page.locator('#url-copy-container')).toHaveText('URL Copied to Clipboard')
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(page.url())
+  test('copies the full link when saving fails', async ({ page }) => {
+    await page.route('**/api/snippets', route => route.abort())
+    await openApp(page, shareLink({ js: "console.log('offline share')" }))
+    await page.locator('#share-button').click()
+    await expect(page.locator('#url-copy-container')).toHaveText("Couldn't save, copied the full link instead")
+    expect(await clipboard(page)).toBe(page.url())
+  })
+
+  test('a long share message sits inside its padded toast on a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 })
+    await page.route('**/api/snippets', route => route.abort())
+    await openApp(page, shareLink({ js: "console.log('offline share')" }))
+    await page.locator('#share-button').click()
+    const toast = page.locator('#url-copy-container')
+    await expect(toast).toHaveText("Couldn't save, copied the full link instead")
+    await expect(toast.locator('.toast-icon-warn')).toBeVisible()
+    await expect(toast.locator('.toast-icon-ok')).toBeHidden()
+    const box = await toast.boundingBox()
+    const text = await toast.locator('.toast-text').boundingBox()
+    expect(box.x).toBeGreaterThanOrEqual(16)
+    expect(box.x + box.width).toBeLessThanOrEqual(360 - 16)
+    expect(text.x - box.x).toBeGreaterThanOrEqual(12)
+    expect(box.x + box.width - (text.x + text.width)).toBeGreaterThanOrEqual(12)
+    expect(text.y - box.y).toBeGreaterThanOrEqual(8)
+    expect(box.y + box.height - (text.y + text.height)).toBeGreaterThanOrEqual(8)
+    const tabs = await page.locator('.mobile-tabs').boundingBox()
+    expect(box.y + box.height).toBeLessThanOrEqual(tabs.y)
+  })
+
+  test('a copied link shows the success icon', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>ok icon</p>' }))
+    await page.locator('#share-button').click()
+    const toast = page.locator('#url-copy-container')
+    await expect(toast).toHaveText('Link copied')
+    await expect(toast.locator('.toast-icon-ok')).toBeVisible()
+    await expect(toast.locator('.toast-icon-warn')).toBeHidden()
+  })
+
+  test('sharing empty editors copies the plain link', async ({ page }) => {
+    let saves = 0
+    page.on('request', request => { if (request.url().endsWith('/api/snippets')) saves++ })
+    await openBlank(page)
+    await page.locator('#share-button').click()
+    await expect.poll(() => clipboard(page)).toBe('http://localhost:4179/')
+    await expect(page.locator('#url-copy-container')).toHaveText('Link copied')
+    expect(saves).toBe(0)
+  })
+
+  test('a mistyped shared link says it does not exist, without asking the API', async ({ page }) => {
+    let calls = 0
+    page.on('request', request => { if (request.url().includes('/api/snippets')) calls++ })
+    await openApp(page, '/s/abcdefghi')
+    await expect(page.locator('#url-copy-container')).toHaveText("That shared link doesn't exist")
+    await expect(page).toHaveURL(/\/$/)
+    expect(calls).toBe(0)
+  })
+
+  test('an unknown shared link opens empty editors and says so', async ({ page }) => {
+    await openApp(page, '/s/zzzzzzzz')
+    await expect(page.locator('#url-copy-container')).toHaveText("That shared link doesn't exist")
+    await expect(page).toHaveURL(/\/$/)
   })
 })
 

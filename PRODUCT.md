@@ -26,7 +26,7 @@ The preview's sandboxing is a property of the product, but it's not something to
 ## Operating Context
 
 - Usually reached by opening the live site or a shared link, cold, on desktop and often on phones.
-- Code lives in the URL hash. Links can be shortened through the builder's own small Express/MongoDB service.
+- Working code lives in the URL hash. Share saves a snapshot in Cody's own Postgres (Neon on Vercel) and copies a short `/s/<id>` link that never changes.
 - Deployed on Vercel (previously Netlify). Old share links must keep working.
 
 ## Capabilities and Constraints
@@ -57,7 +57,7 @@ The preview's sandboxing is a property of the product, but it's not something to
 
 ## Product Principles
 
-1. **Prove it in one viewport.** The first visit should show the edit → preview → console loop working, not describe it.
+1. **Start writing at once.** The first visit opens empty editors; the examples are one click away. A JS-only Console view serves people who just want to try a snippet.
 2. **Zero friction.** Nothing stands between opening a link and running code: no accounts, no modals, no setup.
 3. **Craft is the claim.** Every detail, including the code, is evidence of the builder's skill. Polish beats feature count.
 4. **Links are forever.** Shared code must keep loading across redesigns and hosting moves.

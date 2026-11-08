@@ -8,8 +8,8 @@ Cody is a browser-based HTML/CSS/JS playground. It's vanilla JavaScript built wi
 
 - Three Monaco editors (HTML, CSS, JS) with Emmet support.
 - A live preview rendered into a sandboxed `<iframe srcdoc>`. `console` calls and uncaught errors are forwarded to an in-app console panel through `postMessage`.
-- Code is shared through the URL hash as `html|js|css`, each part URL-safe base64. Older links kept the code in the path, and they still load. A separate Express/MongoDB service shortens links (endpoint in `src/utils/API.js`; backend code: <https://github.com/arr199/Simple-API-Server>).
-- Deployed on Vercel. `vercel.json` rewrites every path to `index.html`, which legacy path-based share links depend on. Don't remove that rewrite. The previous host was Netlify (<https://cody-studio.netlify.app>, `public/_redirects`). Old short links in the shortener's database still point at that domain.
+- The editors' working state lives in the URL hash as `html|js|css`, each part URL-safe base64 (older path links still load). **Share** saves a snapshot through this repo's own API (`api/`, Vercel functions) into Postgres and copies a short `/s/<id>` link. Production uses Neon Postgres (Vercel integration, `DATABASE_URL`); locally, Docker (`docker-compose.yml`). The schema is `scripts/schema.sql`, applied by hand in the Neon SQL editor.
+- Deployed on Vercel. `vercel.json` rewrites every path except `/api/` to `index.html`, which `/s/<id>` links and legacy path links depend on. Don't remove that rewrite. The previous host was Netlify (`public/_redirects`); the old Railway shortener and its links are retired.
 
 ## Rules
 
@@ -17,16 +17,18 @@ Cody is a browser-based HTML/CSS/JS playground. It's vanilla JavaScript built wi
 - Use **pnpm** only. Don't add `package-lock.json`, `yarn.lock` or any other lockfile.
 - Never insert user code, console output or editor marker messages with `innerHTML`. Use `textContent` / `createElement`. Static, trusted markup (icons) is fine.
 - The preview iframe must stay sandboxed **without** `allow-same-origin`, because shared links run arbitrary third-party code.
-- Share links must stay backward compatible. Old links already stored in the shortener's database have to keep loading.
+- Saved `/s/<id>` links and hash links must keep loading. A saved snippet never changes (its GET response is cached as immutable).
 - Import Monaco from `src/editors.js`, never directly from `'monaco-editor'`, so the bundle only includes the HTML/CSS/JS languages.
 - Keep changes scoped to the task. Don't add features or upgrade dependencies unless asked.
+- **No environment-specific code.** Code runs the same locally, in tests and in production; only environment variables differ (`DATABASE_URL`, `VITE_PACKAGE_CDN`). Don't add branches like `isLocal()`, `if (process.env.NODE_ENV === ...)` or test-only guards in app code. Settings such as SSL belong in the connection string, not in code.
+- Keep comments few and short: only where the code can't say it.
 - Match the existing style: ESLint `neostandard` (no semicolons, 2-space indent, space before function parens).
 - Design work uses the `impeccable` skill. Product truth lives in `PRODUCT.md`, the app's design system in `DESIGN.md` (tokens in `.impeccable/design.json`), and per-surface design contracts in `.impeccable/surfaces/`. Read them before changing UI or examples, and offer the user design variants to choose from before building.
 
 ## Testing
 
 - **Every feature and bug fix needs tests.** Add or update tests in the same change. Work without tests isn't done.
-- **Test the real implementation.** Import and call the real modules, and drive the real app in a real browser. Avoid mocks, stubs and fakes. Mock only what you can't run for real, such as third-party network services (the e2e tests fake the link shortener so they never write to its database).
+- **Test the real implementation.** Import and call the real modules, and drive the real app in a real browser. Avoid mocks, stubs and fakes. Mock only what you can't run for real, such as third-party network services (the e2e tests fake the package CDN). The API and e2e tests use the real database in Docker, on its own `cody_test` database.
 - Prefer asserting on what the user sees (rendered preview, console rows, URL, clipboard) over internal details.
 - Tests live in `test/`:
   - `test/unit/`: Vitest tests for pure modules (`*.test.js`).
@@ -42,10 +44,14 @@ pnpm build     # production build into dist/
 pnpm preview   # serve the production build
 pnpm lint      # ESLint
 pnpm test      # unit tests (Vitest)
-pnpm test:e2e  # browser tests (Playwright); builds and serves the app itself
+pnpm test:e2e  # browser tests (Playwright); builds and serves the app and API itself
+
+docker compose up -d  # local Postgres (needed by test:api, test:e2e and dev:api); after a schema change: docker compose down -v && docker compose up -d
+pnpm dev:api   # vercel dev: the app plus the real api/ functions (vercel login + vercel link once)
+pnpm test:api  # API tests against the local test database
 ```
 
-Run `pnpm lint`, `pnpm test` and `pnpm test:e2e` (which also builds) before reporting work as done.
+Run `pnpm lint`, `pnpm test`, `pnpm test:api` and `pnpm test:e2e` (which also builds) before reporting work as done. The last two need `docker compose up -d`.
 
 ## Layout
 
@@ -69,12 +75,17 @@ Run `pnpm lint`, `pnpm test` and `pnpm test:e2e` (which also builds) before repo
 - `src/console/consolePanel.js`: the only module that writes to `#console`: the header strip (filters with counts, Clear), the log with editor errors in their own region, and the prompt's container.
 - `src/console/valueView.js`: draws a value description as text or an expandable tree.
 - `src/console/consolePrompt.js`: the prompt's keys (Enter runs, Shift+Enter adds a line, ↑/↓ history). Its Monaco keybindings are scoped with a `codyPrompt` context key, because Monaco shares keybindings across editors.
-- `src/examples/`: starter examples (`launch` imports an npm package from esm.sh; the others need no network beyond one font). Each folder holds real `markup.html`, `style.css` and `script.js` files, imported as text with `?raw`. `index.js` lists them (`EXAMPLES`, `DEFAULT_EXAMPLE_ID`). A link with no code opens the default example, and loading one pushes a history entry so Back restores the previous code.
+- `src/examples/`: starter examples (`launch` imports an npm package from esm.sh; the others need no network beyond one font). Each folder holds real `markup.html`, `style.css` and `script.js` files, imported as text with `?raw`. `index.js` lists them (`EXAMPLES`, `DEFAULT_EXAMPLE_ID`). A link with no code opens the default (`blank`) example, and loading one pushes a history entry so Back restores the previous code.
 - `src/ui/`: the shell's behaviour.
-  - `workspace.js`: the one owner of which editor and which panel are showing (`data-language` / `data-panel` on `#workspace`).
+  - `workspace.js`: the one owner of which view, editor and panel are showing (`data-view` / `data-language` / `data-panel` on `#workspace`). The `js` view shows only the JS editor beside the console; the preview keeps running hidden.
+  - `viewToggle.js`: the Web | Console toggle in the editor bar, remembered in localStorage. Loaded code picks its view: only JS opens the JS view, any HTML or CSS the web view.
   - `tabs.js`: the desktop editor tabs and the phone tab bar (WAI-ARIA tablists), plus the error dots.
   - `splitter.js` and `layout.js`: the resizable editor/preview split and console drawer, with sizes kept in localStorage.
   - `runControls.js`: the auto-run switch and Run button (in the editor bar, and in the preview toolbar on phones) and the Ctrl/Cmd+Enter shortcut.
-  - `menus.js` (dropdowns), `examplesMenu.js` (the Examples menu with its live preview), `preferences.js` (theme and font size), `copyUrl.js` (shortened share link), `toast.js` (the shared status message).
+  - `menus.js` (dropdowns), `examplesMenu.js` (the Examples menu with its live preview), `preferences.js` (theme and font size), `share.js` (the Share button: save, copy the `/s/` link, or fall back to the hash link), `toast.js` (the shared status message).
+- `src/share/snippetClient.js`: `/s/<id>` routes, and saving and loading snippets through the API.
+- `api/snippets/`: the Vercel functions (`POST /api/snippets`, `GET /api/snippets/:id`). They use only Node's `req`/`res`, so Vercel, `vercel dev` and `scripts/test-server.js` run the same files.
+- `api/_lib/`: code shared by the functions (`snippets.js`: validation, hash, ids; `db.js`: Postgres; `http.js`). Vercel doesn't deploy `_` folders as endpoints.
+- `scripts/`: `schema.sql` (the database schema), `docker-init.sql` (creates `cody` and `cody_test` in Docker) and `test-server.js` (the production build plus the API, for e2e).
 - `src/utils/`: API constants, `debounce`, and static icons.
 - `test/`: see Testing above.

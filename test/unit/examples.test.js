@@ -36,9 +36,9 @@ describe('examples', () => {
     }
   })
 
-  it('default to the welcome example', () => {
-    expect(DEFAULT_EXAMPLE_ID).toBe('welcome')
-    expect(getExample(DEFAULT_EXAMPLE_ID)).toBe(EXAMPLES[0])
+  it('default to the blank example', () => {
+    expect(DEFAULT_EXAMPLE_ID).toBe('blank')
+    expect(getExample(DEFAULT_EXAMPLE_ID)).toMatchObject({ html: '', css: '', js: '' })
     expect(getExample('missing')).toBeUndefined()
   })
 

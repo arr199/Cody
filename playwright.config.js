@@ -23,9 +23,12 @@ export default defineConfig({
   // into the preview after minification, which only a real build exercises.
   webServer: [
     {
-      command: `pnpm build && pnpm preview --port ${PORT} --strictPort`,
+      command: `pnpm build && node scripts/test-server.js ${PORT}`,
       url: `http://localhost:${PORT}`,
-      env: { VITE_PACKAGE_CDN: `http://127.0.0.1:${CDN_PORT}/` },
+      env: {
+        VITE_PACKAGE_CDN: `http://127.0.0.1:${CDN_PORT}/`,
+        DATABASE_URL: 'postgres://cody:cody@localhost:5432/cody_test'
+      },
       // A server you started yourself must be built with the same VITE_PACKAGE_CDN
       reuseExistingServer: !process.env.CI,
       timeout: 120_000

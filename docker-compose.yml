@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cody
+      POSTGRES_PASSWORD: cody
+      POSTGRES_DB: cody
+    ports:
+      - "5432:5432"
+    volumes:
+      - cody-pg:/var/lib/postgresql/data
+      - ./scripts/schema.sql:/schema.sql:ro
+      - ./scripts/docker-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cody -d cody_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  cody-pg:
