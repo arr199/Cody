@@ -1,0 +1,1414 @@
+import http from 'node:http'
+import { test, expect } from '@playwright/test'
+import { encode, decode } from 'js-base64'
+
+// End-to-end tests against the real app, its real API and a local database
+// (docker compose up -d), in a real browser. The only thing faked is the
+// third-party package CDN (test/e2e/fakePackageCdn.js).
+// Builds a share link the same way the app does: html|js|css, URL-safe base64
+const shareLink = ({ html = '', js = '', css = '' }) =>
+  `/#${[html, js, css].map(part => encode(part, true)).join('|')}`
+
+const consoleRows = (page) => page.locator('#console .console-region > div')
+
+// WCAG 2 contrast ratio between two computed `rgb(r, g, b)` colours
+function contrast (a, b) {
+  const luminance = (rgb) => {
+    const [r, g, bl] = rgb.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map(c => {
+      const s = c / 255
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl
+  }
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+const preview = (page) => page.frameLocator('#page')
+
+async function openApp (page, path = '/') {
+  await page.goto(path)
+  await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
+}
+
+// Opens an editor's tab, clicks into it and puts the cursor at the very end
+async function focusEditorEnd (page, selector) {
+  const language = selector.match(/#(\w+)-editor/)[1]
+  await page.locator(`#tab-${language}`).click()
+  await page.locator(`${selector} .view-lines`).click()
+  await page.keyboard.press('Control+End')
+}
+
+const exampleOption = (page, id) => page.locator(`#examples-menu .example-option[data-value="${id}"]`)
+
+async function chooseExample (page, id) {
+  await page.locator('#examples-button').click()
+  await exampleOption(page, id).click()
+}
+
+// A first visit opens empty editors
+async function openBlank (page) {
+  await openApp(page)
+  await expect(page).toHaveURL(/\/$/)
+}
+
+test.describe('preview and console', () => {
+  test('renders the code and shows console output', async ({ page }) => {
+    const js = [
+      "console.log('a'); console.log('a')",
+      'const o = { n: 1 }; o.self = o; console.log(o)',
+      'console.log(window)',
+      "console.warn('careful')",
+      "const tag = '</script>'; console.log('after script tag')",
+      "throw new Error('boom')"
+    ].join('\n')
+    await openApp(page, shareLink({ html: '<h1 id="t">Hello</h1>', js, css: 'h1 { color: rgb(1, 2, 3) }' }))
+
+    await expect(preview(page).locator('#t')).toHaveCSS('color', 'rgb(1, 2, 3)')
+    const rows = consoleRows(page)
+    await expect(rows).toHaveText([
+      'a', // identical logs are both shown
+      'a',
+      '{n: 1, self: [Circular]}',
+      'Window',
+      'careful',
+      'after script tag', // "</script>" in a string doesn't break the page
+      'UncaughtError: boom'
+    ])
+    await expect(rows.filter({ hasText: 'careful' })).toHaveClass('warn')
+    await expect(rows.filter({ hasText: 'boom' })).toHaveClass('error')
+  })
+
+  test('shows HTML in logs as text instead of rendering it', async ({ page }) => {
+    let dialogs = 0
+    page.on('dialog', dialog => { dialogs++; return dialog.dismiss() })
+    await openApp(page, shareLink({ js: "console.log('<img src=x onerror=alert(1)>')" }))
+
+    await expect(consoleRows(page)).toHaveText(['<img src=x onerror=alert(1)>'])
+    await expect(page.locator('#console img')).toHaveCount(0)
+    expect(dialogs).toBe(0)
+  })
+
+  test('sandboxes the preview from the app', async ({ page }) => {
+    const js = [
+      "try { parent.document.body.innerHTML = '' } catch (e) { console.log('parent:' + e.name) }",
+      "try { localStorage.getItem('x') } catch (e) { console.log('storage:' + e.name) }"
+    ].join('\n')
+    await openApp(page, shareLink({ js }))
+
+    await expect(consoleRows(page)).toHaveText(['parent:SecurityError', 'storage:SecurityError'])
+    await expect(page.locator('#workspace')).toBeVisible()
+  })
+
+  test('re-running after edits does not duplicate logs', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('once')" }))
+    await expect(consoleRows(page)).toHaveText(['once'])
+
+    await focusEditorEnd(page, '#js-editor')
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.type(' ')
+      await page.waitForTimeout(1700) // JS re-renders 1.5 s after the last edit
+    }
+    await expect(consoleRows(page)).toHaveText(['once'])
+  })
+
+  test('shows editor errors without wiping the logs', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('kept')" }))
+    await expect(consoleRows(page)).toHaveText(['kept'])
+
+    await focusEditorEnd(page, '#css-editor')
+    await page.keyboard.type('h1 { color: ')
+
+    await expect(consoleRows(page).filter({ hasText: /^css Line 1:/ })).toHaveClass('error')
+    await expect(consoleRows(page).filter({ hasText: 'kept' })).toHaveCount(1)
+  })
+})
+
+const valueLine = (scope, key) => scope.locator('.value-line').filter({ hasText: new RegExp(`^${key}(: | => )`) }).first()
+const toggleOf = (scope) => scope.locator(':scope > .value-tree > .value-toggle')
+const filterButton = (page, name) => page.locator('.console-filters').getByRole('button', { name: new RegExp(`^${name} `) })
+
+test.describe('console inspector', () => {
+  test('expands a nested object level by level, with the mouse and the keyboard', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('data', { a: { b: { c: { d: 'deep' } } }, list: [1, 2] })" }))
+    const row = consoleRows(page).first()
+    await expect(row).toHaveText('data{a: {b: {c: {…}}}, list: [1, 2]}')
+
+    const root = row.locator('.value-toggle').first()
+    await root.click()
+    await expect(root).toHaveAttribute('aria-expanded', 'true')
+    await expect(valueLine(row, 'list')).toHaveText('list: [1, 2]')
+
+    const a = toggleOf(valueLine(row, 'a'))
+    await a.focus()
+    await page.keyboard.press('ArrowRight')
+    const b = toggleOf(valueLine(row, 'b'))
+    await expect(b).toHaveText('{c: {d: "deep"}}')
+    await b.focus()
+    await page.keyboard.press('Enter')
+    await toggleOf(valueLine(row, 'c')).click()
+    await expect(valueLine(row, 'd')).toHaveText('d: "deep"')
+
+    await a.focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(a).toHaveAttribute('aria-expanded', 'false')
+    await expect(valueLine(row, 'b')).toBeHidden()
+  })
+
+  test('shows the value from when it was logged', async ({ page }) => {
+    await openApp(page, shareLink({ js: 'const o = { n: 1 }\nconsole.log(o)\no.n = 2\nconsole.log(o)' }))
+    await expect(consoleRows(page)).toHaveText(['{n: 1}', '{n: 2}'])
+    await consoleRows(page).first().locator('.value-toggle').click()
+    await expect(valueLine(consoleRows(page).first(), 'n')).toHaveText('n: 1')
+  })
+
+  test('summarises elements as tags and expands their children', async ({ page }) => {
+    const html = '<ul id="l" class="x"><li>one</li></ul>'
+    await openApp(page, shareLink({ html, js: "console.log(document.getElementById('l'))" }))
+    const row = consoleRows(page).first()
+    await expect(row).toHaveText('<ul id="l" class="x">')
+    await row.locator('.value-toggle').first().click()
+    await toggleOf(valueLine(row, '0')).click()
+    await expect(valueLine(valueLine(row, '0'), '0')).toHaveText('0: "one"')
+  })
+
+  test('an opened value shows its strings in full', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log({ body: 'x'.repeat(300) })" }))
+    const row = consoleRows(page).first()
+    await row.locator('.value-toggle').click()
+    await expect(valueLine(row, 'body')).toHaveText(`body: "${'x'.repeat(300)}"`)
+  })
+
+  test('page code cannot inject markup or stall the console with forged messages', async ({ page }) => {
+    let dialogs = 0
+    page.on('dialog', dialog => { dialogs++; return dialog.dismiss() })
+    const js = [
+      "let deep = { kind: 'string', text: 'bottom' }",
+      "for (let i = 0; i < 200; i++) deep = { kind: 'object', entries: [['k', deep]] }",
+      "parent.postMessage({ source: 'cody-console', type: 'log', args: [{ kind: 'string', text: '<img src=x onerror=alert(1)>' }, deep] }, '*')",
+      "parent.postMessage({ source: 'cody-console', type: 'log', args: [{ kind: 'script', text: 'x' }] }, '*')",
+      "console.log('still here')"
+    ].join('\n')
+    await openApp(page, shareLink({ js }))
+    await expect(consoleRows(page)).toHaveText(['<img src=x onerror=alert(1)>{k: {k: {k: {…}}}}', 'still here'])
+    await expect(page.locator('#console img')).toHaveCount(0)
+    expect(dialogs).toBe(0)
+  })
+})
+
+test.describe('console controls', () => {
+  test('filters rows by level, with counts', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('a'); console.warn('w'); console.error('e'); console.log('b')" }))
+    await expect(page.locator('.console-filters button')).toHaveText(['All 4', 'Logs 2', 'Warnings 1', 'Errors 1'])
+    await filterButton(page, 'Warnings').click()
+    await expect(filterButton(page, 'Warnings')).toHaveAttribute('aria-pressed', 'true')
+    await expect(consoleRows(page).filter({ visible: true })).toHaveText(['w'])
+    await filterButton(page, 'All').click()
+    await expect(consoleRows(page).filter({ visible: true })).toHaveCount(4)
+  })
+
+  test('says when a filter hides everything', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('only a log')" }))
+    await filterButton(page, 'Errors').click()
+    await expect(page.locator('#console .console-empty')).toHaveText('Nothing to show for this filter')
+  })
+
+  test('Clear, Ctrl+L and console.clear() empty the logs but keep editor errors', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('x')", css: 'h1 { color: ' }))
+    const editorError = consoleRows(page).filter({ hasText: /^css Line 1:/ })
+    await expect(editorError).toHaveCount(1)
+    await page.locator('.console-clear').click()
+    await expect(consoleRows(page)).toHaveCount(1)
+    await expect(editorError).toHaveCount(1)
+
+    await page.locator('.editor-bar .run-button').click()
+    await expect(consoleRows(page).filter({ hasText: /^x$/ })).toHaveCount(1)
+    await page.locator('#console .console-log').focus()
+    await page.keyboard.press('Control+l')
+    await expect(consoleRows(page).filter({ hasText: /^x$/ })).toHaveCount(0)
+    await expect(editorError).toHaveCount(1)
+  })
+
+  test('console.clear() clears what came before it', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('gone'); console.clear(); console.log('kept')" }))
+    await expect(consoleRows(page)).toHaveText(['kept'])
+  })
+
+  test('console.table renders a table', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.table([{ name: 'Ada', year: 1815 }, { name: 'Alan', year: 1912 }])" }))
+    const grid = page.locator('#console table')
+    await expect(grid.locator('thead th')).toHaveText(['(index)', 'name', 'year'])
+    await expect(grid.locator('tbody tr').first().locator('th, td')).toHaveText(['0', 'Ada', '1815'])
+  })
+
+  test('keeps the newest 1000 rows and says how many older ones were removed', async ({ page }) => {
+    await openApp(page, shareLink({ js: "for (let i = 0; i < 3000; i++) console.log('row ' + i)" }))
+    await expect(filterButton(page, 'All')).toHaveText('All 3000')
+    await expect(consoleRows(page)).toHaveCount(1000)
+    await expect(consoleRows(page).first()).toHaveText('row 2000')
+    await expect(page.locator('#console .console-dropped')).toHaveText('2000 older messages removed')
+    await page.locator('.console-clear').click()
+    await expect(page.locator('#console .console-dropped')).toBeHidden()
+  })
+
+  test('keeps up with thousands of logs', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "for (let i = 0; i < 2000; i++) console.log('row ' + i)" }))
+    await expect(filterButton(page, 'All')).toHaveText('All 2000')
+    await expect(consoleRows(page).last()).toHaveText('row 1999')
+    await expect(consoleRows(page).last()).toBeInViewport()
+    await page.locator('#tab-css').click()
+    await expect(page.locator('#css-editor')).toBeVisible()
+  })
+})
+
+const promptRows = (page) => page.locator('#console .prompt-input, #console .prompt-result')
+
+async function runInConsole (page, code) {
+  await page.locator('.console-prompt .view-lines').click()
+  await page.keyboard.type(code)
+  await page.keyboard.press('Enter')
+}
+
+test.describe('console prompt on a slow page', () => {
+  let server
+  let port
+  test.beforeAll(async () => {
+    // A stylesheet that takes 1.5 s holds back the page's own scripts
+    server = http.createServer((req, res) => setTimeout(() => {
+      res.writeHead(200, { 'content-type': 'text/css', 'cache-control': 'no-store' })
+      res.end('p { color: rgb(1, 2, 3) }')
+    }, 1500))
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    port = server.address().port
+  })
+  test.afterAll(() => server.close())
+
+  test("an entry sent while the page loads runs after the page's own scripts", async ({ page }) => {
+    const html = `<link rel="stylesheet" href="http://127.0.0.1:${port}/slow.css"><p>x</p>`
+    await openApp(page, shareLink({ html, js: "const MESSAGE = 'hello'" }))
+    await page.locator('.editor-bar .run-button').click()
+    await runInConsole(page, 'MESSAGE')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['"hello"'])
+  })
+})
+
+test.describe('console prompt', () => {
+  test('runs code in the page and shows its value', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, '2 + 2')
+    await expect(promptRows(page)).toHaveText(['2 + 2', '4'])
+    await runInConsole(page, 'document.title')
+    await expect(promptRows(page).last()).toHaveText('"Preview"')
+  })
+
+  test('keeps let declarations between entries, and sees the page\'s variables', async ({ page }) => {
+    await openApp(page, shareLink({ js: "const MESSAGE = 'greetings'" }))
+    await runInConsole(page, 'let x = 1')
+    await runInConsole(page, 'x + 1')
+    await runInConsole(page, 'MESSAGE')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['undefined', '2', /^"greetings/])
+  })
+
+  test('supports await, multi-line entries and errors', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, 'await Promise.resolve(5)')
+    await expect(page.locator('#console .prompt-result').last()).toHaveText('5')
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.type('const a = 1')
+    await page.keyboard.press('Shift+Enter')
+    await page.keyboard.type('a + 1')
+    await page.keyboard.press('Enter')
+    await expect(page.locator('#console .prompt-result').last()).toHaveText('2')
+    await runInConsole(page, 'nope()')
+    await expect(consoleRows(page).last()).toHaveText('UncaughtReferenceError: nope is not defined')
+  })
+
+  test('stops a runaway loop typed at the prompt', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, 'while (true) {}')
+    await expect(consoleRows(page).filter({ hasText: 'Stopped a loop at Console line 1' })).toHaveCount(1)
+    await page.locator('#tab-css').click()
+    await expect(page.locator('#css-editor')).toBeVisible()
+  })
+
+  test('↑ recalls earlier entries, and a run clears the entries but not the history', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, '6 * 7')
+    await expect(promptRows(page)).toHaveText(['6 * 7', '42'])
+    await page.locator('.editor-bar .run-button').click()
+    await expect(promptRows(page)).toHaveCount(0)
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.press('ArrowUp')
+    await expect(page.locator('.console-prompt .view-lines')).toHaveText(/6\s\*\s7/)
+  })
+
+  test('an entry sent while the preview reloads still runs', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.type('1 + 1')
+    await page.locator('.editor-bar .run-button').click()
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.press('Enter')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['2'])
+  })
+
+  test('Ctrl+Enter in the prompt runs the preview and keeps the entry', async ({ page }) => {
+    await openApp(page, shareLink({ js: 'document.body.dataset.run = Math.random()' }))
+    const body = preview(page).locator('body')
+    await expect(body).toHaveAttribute('data-run', /\d/)
+    const first = await body.getAttribute('data-run')
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.type('draft')
+    await page.keyboard.press('Control+Enter')
+    await expect(body).not.toHaveAttribute('data-run', first)
+    await expect(page.locator('.console-prompt .view-lines')).toHaveText('draft')
+  })
+
+  test('the prompt\'s own syntax errors are not editor errors', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('.console-prompt .view-lines').click()
+    await page.keyboard.type('let = ')
+    await page.waitForTimeout(2600) // editor errors refresh 1.5 s after a change
+    await expect(page.locator('.editor-tabs .error-dot:visible')).toHaveCount(0)
+    await expect(consoleRows(page).filter({ hasText: / Line \d+:/ })).toHaveCount(0)
+  })
+
+  test('works in the phone layout', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('.mobile-tabs [data-panel="console"]').click()
+    await runInConsole(page, '1 + 2')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['3'])
+  })
+})
+
+// Packages come from the local fake CDN (test/e2e/fakePackageCdn.js): greet
+// and canvas-confetti exist, anything else is a 404, offline-* can't be reached
+test.describe('npm imports', () => {
+  test('runs a package imported by name', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import greet from 'greet'\nconsole.log(greet('cody'))" }))
+    await expect(consoleRows(page)).toHaveText(['hi cody'])
+  })
+
+  test('names a package that does not exist', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import confetti from 'canvas-confeti'\nconsole.log('ran')" }))
+    await expect(consoleRows(page)).toHaveText(["Couldn't load 'canvas-confeti' from esm.sh (404). Check the package name and version."])
+  })
+
+  test('says when the CDN cannot be reached, once per package', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import a from 'offline-one'\nimport b from 'offline-two'" }))
+    await expect(consoleRows(page)).toHaveCount(2)
+    await expect(consoleRows(page).filter({ hasText: "Couldn't reach esm.sh to load 'offline-one'. Check your connection." })).toHaveCount(1)
+    await expect(consoleRows(page).filter({ hasText: "Couldn't reach esm.sh to load 'offline-two'. Check your connection." })).toHaveCount(1)
+    await page.waitForTimeout(500)
+    await expect(consoleRows(page)).toHaveCount(2)
+  })
+
+  test('an unused import is not reported as an editor error', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import greet from 'greet'\nconsole.log('ran')" }))
+    await expect(consoleRows(page)).toHaveText(['ran'])
+    await page.waitForTimeout(2600) // editor errors refresh 1.5 s after a change
+    await expect(consoleRows(page)).toHaveText(['ran'])
+    await expect(page.locator('#tab-js .error-dot')).toBeHidden()
+  })
+
+  test('names a version that does not exist', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import greet from 'greet@9'" }))
+    await expect(consoleRows(page)).toHaveText(["Couldn't load 'greet@9' from esm.sh (404). Check the package name and version."])
+  })
+
+  test('says so when any other import fails to load', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import x from 'https://bad.invalid/x.js'" }))
+    await expect(consoleRows(page)).toHaveText(["A module script couldn't load one of its imports."])
+  })
+
+  test('a page\'s own import map wins over the CDN', async ({ page }) => {
+    const html = '<script type="importmap">{ "imports": { "app": "data:text/javascript,export default \'mapped\'" } }</script>'
+    await openApp(page, shareLink({ html, js: "import app from 'app'\nconsole.log(app)" }))
+    await expect(consoleRows(page)).toHaveText(['mapped'])
+  })
+
+  test('a missing named export reports the real error', async ({ page }) => {
+    await openApp(page, shareLink({ js: "import { nope } from 'greet'" }))
+    await expect(consoleRows(page)).toHaveText([/^UncaughtSyntaxError: .*nope/])
+  })
+
+  test('a pane without static imports still shares variables with the prompt', async ({ page }) => {
+    await openApp(page, shareLink({ js: "const answer = 42\nimport('greet').then(m => console.log(m.default('x')))" }))
+    await expect(consoleRows(page)).toHaveText(['hi x'])
+    await runInConsole(page, 'answer')
+    await expect(page.locator('#console .prompt-result')).toHaveText(['42'])
+  })
+
+  test('await import() works at the prompt', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await runInConsole(page, "(await import('greet')).version")
+    await expect(page.locator('#console .prompt-result')).toHaveText(['"1.0.0"'])
+  })
+
+  test('Open in new tab runs packages too', async ({ page }) => {
+    await page.goto('/preview.html' + shareLink({ js: "import greet from 'greet'\ndocument.body.append(greet('tab'))" }).slice(1))
+    await expect(page.frameLocator('#page').locator('body')).toHaveText('hi tab')
+  })
+})
+
+test.describe('run control', () => {
+  const autoRun = (page) => page.locator('.editor-bar').getByRole('switch', { name: 'Auto-run' })
+  const runButton = (page) => page.locator('.editor-bar').getByRole('button', { name: /^Run/ })
+
+  test('with auto-run off, edits wait for Run, which shows the preview is out of date', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p id="t">one</p>' }))
+    const firstUrl = page.url()
+    await autoRun(page).click()
+    await expect(autoRun(page)).toHaveAttribute('aria-checked', 'false')
+
+    await focusEditorEnd(page, '#html-editor')
+    await page.keyboard.type(' two')
+    await page.waitForTimeout(900) // HTML would have re-run after 0.5 s
+    await expect(preview(page).locator('body')).toHaveText('one')
+    await expect(runButton(page)).toHaveAccessibleName('Run, preview out of date')
+    await expect(runButton(page)).toHaveAttribute('data-stale', '')
+    expect(page.url()).not.toBe(firstUrl) // the link still follows the editors
+
+    // Ctrl+Enter in the editor runs it, without adding a line
+    await page.keyboard.press('Control+Enter')
+    await expect(preview(page).locator('body')).toHaveText('one two')
+    await expect(runButton(page)).toHaveAccessibleName('Run')
+    await expect(page.locator('#html-editor .view-line')).toHaveCount(1)
+  })
+
+  test('Run re-runs the code straight away', async ({ page }) => {
+    await openApp(page, shareLink({ js: 'document.body.dataset.run = Math.random()' }))
+    const body = preview(page).locator('body')
+    await expect(body).toHaveAttribute('data-run', /\d/)
+    const first = await body.getAttribute('data-run')
+    await runButton(page).click()
+    await expect(body).not.toHaveAttribute('data-run', first)
+    await expect(runButton(page)).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter')
+  })
+
+  test('turning auto-run back on runs out-of-date code', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>one</p>' }))
+    await autoRun(page).click()
+    await focusEditorEnd(page, '#html-editor')
+    await page.keyboard.type(' two')
+    await expect(runButton(page)).toHaveAttribute('data-stale', '')
+    await autoRun(page).click()
+    await expect(preview(page).locator('body')).toHaveText('one two')
+    await expect(runButton(page)).not.toHaveAttribute('data-stale')
+  })
+
+  test('remembers auto-run off, and still runs code that is loaded', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>first</p>' }))
+    await autoRun(page).click()
+
+    await page.goto(shareLink({ html: '<p>second</p>' })) // another link in the same tab
+    await expect(preview(page).locator('body')).toHaveText('second')
+
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
+    await expect(autoRun(page)).toHaveAttribute('aria-checked', 'false')
+    await expect(preview(page).locator('body')).toHaveText('second')
+    await expect(runButton(page)).not.toHaveAttribute('data-stale')
+  })
+
+  test('the editor bar fits its controls at the narrowest split', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('.handle-split').focus()
+    await page.keyboard.press('Home')
+    const pane = await page.locator('.editor-pane').boundingBox()
+    const tab = await page.locator('#tab-js').boundingBox()
+    for (const control of await page.locator('.editor-bar button:visible').all()) {
+      const box = await control.boundingBox()
+      expect(box.x + box.width).toBeLessThanOrEqual(pane.x + pane.width + 0.5)
+      expect(box.y).toBeGreaterThanOrEqual(tab.y - 1) // one row, beside the tabs
+      expect(box.y + box.height).toBeLessThanOrEqual(tab.y + tab.height + 1)
+    }
+  })
+
+  test('on phones, the controls sit in the preview toolbar', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openApp(page, shareLink({ html: '<p>one</p>' }))
+    const toolbar = page.locator('.device-toolbar')
+    const phoneRun = toolbar.getByRole('button', { name: /^Run/ })
+    await expect(page.locator('.editor-bar')).toBeHidden()
+    await toolbar.getByRole('switch', { name: 'Auto-run' }).click()
+
+    await page.locator('.mobile-tabs [data-language="html"]').click()
+    await page.locator('#html-editor .view-lines').click()
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type(' two')
+    await page.locator('.mobile-tabs [data-panel="preview"]').click()
+    await expect(phoneRun).toHaveAccessibleName('Run, preview out of date')
+
+    await phoneRun.click()
+    await expect(preview(page).locator('body')).toHaveText('one two')
+  })
+})
+
+test.describe('loop guard', () => {
+  test('stops an infinite loop in the JS pane and runs the rest of the script', async ({ page }) => {
+    const js = "console.log('before')\nwhile (true) {}\ndocument.body.append('after the loop')"
+    await openApp(page, shareLink({ html: ' ', js }))
+
+    await expect(preview(page).locator('body')).toHaveText('after the loop')
+    const stopped = consoleRows(page).filter({ hasText: 'Stopped a loop at JS line 2 after 1 s. It may be infinite.' })
+    await expect(stopped).toHaveClass('error')
+    await expect(consoleRows(page).filter({ hasText: 'before' })).toHaveCount(1)
+
+    // The app is still responsive
+    await page.locator('#tab-css').click()
+    await expect(page.locator('#css-editor')).toBeVisible()
+  })
+
+  test('stops an infinite loop in a script in the HTML pane', async ({ page }) => {
+    const html = "<p id=\"t\">waiting</p>\n<script>\nfor (;;) {}\ndocument.getElementById('t').textContent = 'done'\n</script>"
+    await openApp(page, shareLink({ html }))
+
+    await expect(preview(page).locator('#t')).toHaveText('done')
+    await expect(consoleRows(page).filter({ hasText: 'Stopped a loop at HTML line 3' })).toHaveCount(1)
+  })
+
+  test('guards the preview opened in a new tab too', async ({ page }) => {
+    await page.goto('/preview.html' + shareLink({ js: "while (true) {}\ndocument.body.append('after the loop')" }).slice(1))
+    await expect(page.frameLocator('#page').locator('body')).toHaveText('after the loop')
+  })
+})
+
+test.describe('preview history', () => {
+  test('re-rendering the preview does not add browser history entries', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>hi</p>', js: "console.log('v1')" }))
+    await expect(consoleRows(page)).toHaveText(['v1'])
+    const entries = await page.evaluate(() => history.length)
+
+    await focusEditorEnd(page, '#css-editor')
+    await page.keyboard.type('p { color: rgb(9, 9, 9) }')
+    await expect(preview(page).locator('p')).toHaveCSS('color', 'rgb(9, 9, 9)')
+
+    expect(await page.evaluate(() => history.length)).toBe(entries)
+  })
+})
+
+test.describe('editors', () => {
+  test('expands Emmet abbreviations in the HTML editor', async ({ page }) => {
+    await openBlank(page)
+    await focusEditorEnd(page, '#html-editor')
+    await page.keyboard.type('h1#title')
+    await expect(page.locator('#html-editor .suggest-widget')).toBeVisible()
+    await page.keyboard.press('Tab')
+
+    await expect(preview(page).locator('h1#title')).toHaveCount(1)
+  })
+
+  test('suggests completions in the JS editor', async ({ page }) => {
+    test.slow() // the TypeScript worker can take a while to start under load
+    await openBlank(page)
+    await focusEditorEnd(page, '#js-editor')
+    await page.keyboard.type('console.lo')
+
+    // The TypeScript worker can still be starting under load; Ctrl+Space asks again
+    const suggestions = page.locator('#js-editor .suggest-widget')
+    await expect(async () => {
+      await page.keyboard.press('Control+Space')
+      await expect(suggestions).toContainText('log', { timeout: 2_000 })
+    }).toPass({ timeout: 90_000 })
+  })
+
+  test('opens the find widget', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('find me')" }))
+    await focusEditorEnd(page, '#js-editor')
+    await page.keyboard.press('Control+f')
+
+    await expect(page.locator('#js-editor .find-widget')).toBeVisible()
+  })
+})
+
+test.describe('examples', () => {
+  test('the welcome example answers in the console', async ({ page }) => {
+    // The logo never stops riding its wave, so a click could never land on a
+    // still target. Reduced motion stills it, and is worth covering anyway.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await openApp(page)
+    await chooseExample(page, 'welcome')
+    // Without motion the whole message is printed, wrapped, and fully on screen
+    const scroller = preview(page).locator('.scroller')
+    await expect(scroller).toContainText('edit MESSAGE in the js')
+    await expect.poll(() => scroller.evaluate(el =>
+      el.scrollWidth <= el.clientWidth && el.getBoundingClientRect().bottom <= window.innerHeight
+    )).toBe(true)
+
+    const letters = preview(page).locator('.logo .letter')
+    await expect(letters).toHaveText(['c', 'o', 'd', 'y'])
+    await expect(consoleRows(page).first()).toContainText('Intro running')
+
+    await letters.first().click()
+    await expect(letters.first()).toHaveClass(/flipped/)
+    await expect(consoleRows(page).last()).toContainText('Letter flipped')
+    // The URL now holds the welcome code, so a reload or share keeps it
+    await expect(page).toHaveURL(/\/#.+/)
+  })
+
+  test('scrolls whatever MESSAGE the welcome JS sets', async ({ page }) => {
+    await openApp(page)
+    await chooseExample(page, 'welcome')
+    await expect(preview(page).locator('.logo .letter')).toHaveCount(4)
+    const [html, js, css] = new URL(page.url()).hash.slice(1).split('|').map(part => decode(part))
+    const edited = js.replace(/const MESSAGE = '[^']*'/, "const MESSAGE = 'hello from the test'")
+    expect(edited).not.toBe(js)
+
+    await page.goto(shareLink({ html, js: edited, css }))
+    await expect(preview(page).locator('.scroller')).toHaveText('hello from the test')
+  })
+
+  test('does not replace code from a share link with the welcome example', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('mine')" }))
+    await expect(consoleRows(page)).toHaveText(['mine'])
+    await expect(preview(page).locator('.logo')).toHaveCount(0)
+  })
+
+  test('previews the hovered example in the menu before loading it', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('mine')" }))
+    await page.locator('#examples-button').click()
+    // The previewed item is marked in the list
+    await expect(exampleOption(page, 'welcome')).toHaveAttribute('aria-current', 'true')
+
+    await exampleOption(page, 'canvas').hover()
+    await expect(exampleOption(page, 'canvas')).toHaveAttribute('aria-current', 'true')
+    await expect(exampleOption(page, 'welcome')).not.toHaveAttribute('aria-current')
+    const detail = page.locator('#examples-menu .example-detail')
+    await expect(detail.locator('.example-detail-title')).toHaveText('Fireflies')
+    await expect(detail.frameLocator('iframe').locator('canvas')).toHaveCount(1)
+    await expect(consoleRows(page)).toHaveText(['mine']) // previewing loads nothing
+
+    await detail.getByRole('button', { name: 'Load example' }).click()
+    await expect(preview(page).locator('canvas')).toHaveCount(1)
+    await expect(page.locator('#examples-menu')).toBeHidden()
+  })
+
+  test('loads an example from the menu', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('mine')" }))
+    const before = page.url()
+
+    await chooseExample(page, 'canvas')
+    await expect(preview(page).locator('canvas')).toHaveCount(1)
+    await expect(page.locator('#examples-menu')).toBeHidden()
+    expect(page.url()).not.toBe(before)
+  })
+
+  test('Launch control imports a package, arms behind its cover, and logs each launch', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('mine')" }))
+    await chooseExample(page, 'launch')
+    const launch = preview(page).getByRole('button', { name: 'Launch' })
+    await expect(launch).toBeDisabled()
+
+    await preview(page).getByRole('button', { name: 'Safety cover' }).click()
+    await expect(preview(page).locator('.state')).toHaveText('ARMED')
+    await launch.click()
+    await expect(consoleRows(page).last()).toContainText('launch: 1')
+    await expect(preview(page).locator('.count')).toHaveText('01')
+    // The fake canvas-confetti records each burst it was asked for
+    expect(await preview(page).locator('body').evaluate(() => window.confettiBursts.length)).toBe(1)
+  })
+
+  test('examples set their labels in their own typefaces', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('mine')" }))
+
+    await chooseExample(page, 'canvas')
+    await expect(preview(page).locator('.label')).toHaveCSS('font-family', /Caveat/)
+
+    await chooseExample(page, 'todo')
+    const stamp = preview(page).locator('.card.done').first()
+    await expect.poll(() => stamp.evaluate(el => {
+      const after = getComputedStyle(el, '::after')
+      return `${after.fontFamily} ${after.fontSize}`
+    })).toMatch(/Kalam.* 19px/)
+  })
+
+  test('Back restores the code from before an example was loaded', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('mine')" }))
+    await expect(consoleRows(page)).toHaveText(['mine'])
+
+    await chooseExample(page, 'todo')
+    await expect(preview(page).locator('form')).toHaveCount(1)
+
+    // A hash-only history step never fires a page load for goBack() to wait on
+    await page.evaluate(() => history.back())
+    await expect(consoleRows(page)).toHaveText(['mine'])
+    await expect(preview(page).locator('form')).toHaveCount(0)
+  })
+
+  test('an empty console says where output will appear', async ({ page }) => {
+    await openBlank(page)
+    await expect(consoleRows(page)).toHaveCount(0)
+    await expect(page.locator('#console .console-empty')).toHaveText('Console output appears here')
+  })
+
+  test('Blank clears every editor and the preview', async ({ page }) => {
+    await openBlank(page)
+
+    for (const editor of ['#html-editor', '#css-editor', '#js-editor']) {
+      await expect(page.locator(`${editor} .view-lines`)).toHaveText('')
+    }
+    await expect(consoleRows(page)).toHaveCount(0)
+    await expect(preview(page).locator('body')).toBeEmpty()
+  })
+
+  test('lists each example with what it teaches and works from the keyboard', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('mine')" }))
+    const button = page.locator('#examples-button')
+    const menu = page.locator('#examples-menu')
+
+    await button.click()
+    await expect(exampleOption(page, 'canvas')).toContainText('requestAnimationFrame')
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await expect(button).toBeFocused()
+
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Enter') // first item: the welcome example
+    await expect(menu).toBeHidden()
+    await expect(preview(page).locator('.logo .letter')).toHaveCount(4)
+  })
+})
+
+test.describe('views', () => {
+  const viewButton = (page, name) => page.locator('.view-toggle').getByRole('button', { name })
+  // The preview keeps running in the Console view, just out of sight and out of reach
+  async function expectPreviewOutOfSight (page) {
+    const pane = page.locator('.preview-pane')
+    await expect(pane).toHaveAttribute('inert')
+    await expect.poll(async () => (await pane.boundingBox()).width).toBeLessThanOrEqual(1)
+  }
+
+  test('a first visit opens empty editors in the web view', async ({ page }) => {
+    await openApp(page)
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.locator('#js-editor')).toBeVisible()
+    await expect(page.locator('#page')).toBeVisible()
+    await expect(viewButton(page, 'Web')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('the Console view shows only JS beside a full-height console, and still runs it', async ({ page }) => {
+    await openBlank(page)
+    await viewButton(page, 'Console').click()
+    await expect(viewButton(page, 'Console')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.locator('#tab-html')).toBeHidden()
+    await expect(page.locator('#tab-css')).toBeHidden()
+    await expectPreviewOutOfSight(page)
+
+    const editor = await page.locator('.editor-pane').boundingBox()
+    const consolePane = await page.locator('#console').boundingBox()
+    expect(consolePane.x).toBeGreaterThan(editor.x + editor.width)
+    expect(Math.abs(consolePane.height - editor.height)).toBeLessThanOrEqual(1)
+
+    await focusEditorEnd(page, '#js-editor')
+    await page.keyboard.type("console.log([1, 2].map(n => n * 2).join(','))")
+    await expect(consoleRows(page)).toHaveText(['2,4'])
+  })
+
+  test('the tab keys skip the tabs the Console view hides', async ({ page }) => {
+    await openBlank(page)
+    await viewButton(page, 'Console').click()
+    await page.locator('#tab-js').focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('#tab-js')).toBeFocused()
+    await expect(page.locator('#js-editor')).toBeVisible()
+  })
+
+  test('a JS-only link opens in the Console view, a link with markup in the web view', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('only js')" }))
+    await expect(viewButton(page, 'Console')).toHaveAttribute('aria-pressed', 'true')
+    await expect(consoleRows(page)).toHaveText(['only js'])
+    await expectPreviewOutOfSight(page)
+
+    await chooseExample(page, 'canvas')
+    await expect(viewButton(page, 'Web')).toHaveAttribute('aria-pressed', 'true')
+    await expect(preview(page).locator('canvas')).toHaveCount(1)
+  })
+
+  test('the chosen view is remembered', async ({ page }) => {
+    await openBlank(page)
+    await viewButton(page, 'Console').click()
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toHaveCount(4)
+    await expect(viewButton(page, 'Console')).toHaveAttribute('aria-pressed', 'true')
+    await expectPreviewOutOfSight(page)
+  })
+
+  test('on phones the Console view has only the JS and Console tabs', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await openApp(page, shareLink({ js: "console.log('phone js')" }))
+    await expect(page.locator('#js-editor')).toBeVisible()
+    await expect(page.locator('.mobile-tabs [role="tab"]:visible')).toHaveText(['JS', 'Console'])
+    await page.locator('.mobile-tabs [data-panel="console"]').click()
+    await expect(consoleRows(page)).toHaveText(['phone js'])
+
+    await page.locator('.mobile-tabs [data-language="js"]').click()
+    await viewButton(page, 'Web').click()
+    await expect(page.locator('.mobile-tabs [role="tab"]:visible')).toHaveText(['HTML', 'CSS', 'JS', 'Preview', 'Console'])
+  })
+})
+
+test.describe('tabbed editor', () => {
+  test('tabs switch between the three editors', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>hello</p>', css: 'p { color: red }', js: "console.log('j')" }))
+    await expect(page.locator('#js-editor')).toBeVisible()
+    await expect(page.locator('#html-editor')).toBeHidden()
+
+    await page.locator('#tab-html').click()
+    await expect(page.locator('#html-editor')).toBeVisible()
+    await expect(page.locator('#html-editor .view-lines')).toContainText('<p>hello</p>')
+    await expect(page.locator('#tab-html')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#js-editor')).toBeHidden()
+  })
+
+  test('tabs work from the keyboard', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('j')" }))
+    await page.locator('#tab-js').focus()
+    await page.keyboard.press('ArrowRight') // wraps around to HTML
+    await expect(page.locator('#tab-html')).toBeFocused()
+    await expect(page.locator('#html-editor')).toBeVisible()
+    await page.keyboard.press('End')
+    await expect(page.locator('#tab-js')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#tab-js')).toBeFocused()
+  })
+
+  test('a syntax error puts a dot on its language tab', async ({ page }) => {
+    await openApp(page, shareLink({ css: 'p { color: }' }))
+    await expect(page.locator('#tab-css .error-dot')).toBeVisible()
+    await expect(page.locator('#tab-js .error-dot')).toBeHidden()
+  })
+
+  test('loading code opens the JS tab', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('mine')" }))
+    await page.locator('#tab-css').click()
+    await chooseExample(page, 'canvas')
+    await expect(page.locator('#tab-js')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#js-editor')).toBeVisible()
+  })
+
+  test('the top bar and view buttons are gone', async ({ page }) => {
+    await openApp(page)
+    await expect(page.locator('.top-navbar')).toHaveCount(0)
+    await expect(page.locator('#frontend-view-button')).toHaveCount(0)
+  })
+})
+
+test.describe('resizable layout', () => {
+  async function drag (page, locator, dx, dy) {
+    const box = await locator.boundingBox()
+    const x = box.x + box.width / 2
+    const y = box.y + box.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + dx, y + dy, { steps: 8 })
+    await page.mouse.up()
+  }
+
+  test('dragging the split resizes the editor, even across the preview, and is remembered', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('x')" }))
+    const editor = page.locator('.editor-pane')
+    const start = (await editor.boundingBox()).width
+
+    await drag(page, page.locator('.handle-split'), -200, 0)
+    const narrower = (await editor.boundingBox()).width
+    expect(narrower).toBeLessThan(start - 150)
+
+    // Dragging right passes over the preview iframe; pointer capture keeps it going
+    await drag(page, page.locator('.handle-split'), 300, 0)
+    const wider = (await editor.boundingBox()).width
+    expect(wider).toBeGreaterThan(narrower + 250)
+
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
+    expect(Math.abs((await editor.boundingBox()).width - wider)).toBeLessThan(4)
+  })
+
+  test('handles work from the keyboard and reset on double-click', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('x')" }))
+    const handle = page.locator('.handle-split')
+    await expect(handle).toHaveAttribute('role', 'separator')
+    await expect(handle).toHaveAttribute('aria-valuenow', '50')
+
+    await handle.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(handle).toHaveAttribute('aria-valuenow', '52')
+    await page.keyboard.press('Shift+ArrowLeft')
+    await expect(handle).toHaveAttribute('aria-valuenow', '42')
+
+    await handle.dblclick()
+    await expect(handle).toHaveAttribute('aria-valuenow', '50')
+  })
+
+  test('the console drawer resizes and is remembered', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('x')" }))
+    const handle = page.locator('.handle-console')
+    const consolePane = page.locator('#console')
+    expect(Math.round((await consolePane.boundingBox()).height)).toBe(160)
+
+    await handle.focus()
+    await page.keyboard.press('Shift+ArrowUp')
+    await page.keyboard.press('Shift+ArrowUp')
+    await expect(handle).toHaveAttribute('aria-valuenow', '288')
+    expect(Math.round((await consolePane.boundingBox()).height)).toBe(288)
+
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
+    expect(Math.round((await consolePane.boundingBox()).height)).toBe(288)
+  })
+
+  test('stored sizes outside the limits are clamped', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('cody-layout-split', '99')
+      localStorage.setItem('cody-layout-console', 'oops')
+    })
+    await openApp(page, shareLink({ js: "console.log('x')" }))
+    await expect(page.locator('.handle-split')).toHaveAttribute('aria-valuenow', '80')
+    await expect(page.locator('.handle-console')).toHaveAttribute('aria-valuenow', '160')
+  })
+
+  test('re-clamps the console when the window shrinks', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>web</p>', js: "console.log('x')" }))
+    const handle = page.locator('.handle-console')
+    await handle.focus()
+    await page.keyboard.press('End') // as tall as allowed: 70% of the workspace
+    await page.setViewportSize({ width: 1400, height: 500 })
+
+    await expect.poll(async () => {
+      const workspace = await page.locator('#workspace').boundingBox()
+      const consoleBox = await page.locator('#console').boundingBox()
+      return consoleBox.height <= (workspace.height - 24) * 0.7 + 1
+    }).toBe(true)
+
+    // Back at full height, the console returns to the size that was chosen
+    await page.setViewportSize({ width: 1400, height: 900 })
+    await expect.poll(async () => Math.round((await page.locator('#console').boundingBox()).height))
+      .toBeGreaterThan(600)
+  })
+})
+
+test.describe('device preview', () => {
+  const frameWidth = async (page) => Math.round((await page.locator('.preview-frame').boundingBox()).width)
+
+  test('presets set the preview width and the readout follows', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.getByRole('button', { name: 'Phone' }).click()
+    expect(await frameWidth(page)).toBe(375)
+    await expect(page.locator('.frame-readout')).toHaveText('375 px')
+    await expect(page.getByRole('button', { name: 'Phone' })).toHaveAttribute('aria-pressed', 'true')
+
+    await page.getByRole('button', { name: 'Full', exact: true }).click()
+    const stage = Math.round((await page.locator('.preview-stage').boundingBox()).width)
+    expect(await frameWidth(page)).toBe(stage)
+    await expect(page.getByRole('button', { name: 'Full', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('dragging the frame edge sets any width and is remembered', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.getByRole('button', { name: 'Tablet' }).click()
+    const before = await frameWidth(page)
+    const handle = page.locator('.handle-frame')
+    const box = await handle.boundingBox()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x - 100, box.y + box.height / 2, { steps: 6 })
+    await page.mouse.up()
+
+    const width = await frameWidth(page)
+    expect(width).toBeLessThan(before - 150) // centred frame: both edges move
+    await expect(page.locator('.frame-readout')).toHaveText(`${width} px`)
+    for (const name of ['Phone', 'Tablet', 'Full']) {
+      await expect(page.getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'false')
+    }
+
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
+    expect(Math.abs(await frameWidth(page) - width)).toBeLessThan(2)
+  })
+
+  test('a stored width never overflows the stage', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('cody-preview-width', '5000'))
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    const stage = Math.round((await page.locator('.preview-stage').boundingBox()).width)
+    expect(await frameWidth(page)).toBeLessThanOrEqual(stage)
+    await expect(page.locator('.frame-readout')).toHaveText(new RegExp(`^${await frameWidth(page)}( / 5000)? px$`))
+  })
+
+  test('a chosen width survives the preview being hidden by a narrow window', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.getByRole('button', { name: 'Phone' }).click()
+    await page.locator('#tab-css').click()
+    await page.setViewportSize({ width: 800, height: 900 }) // phone layout: the preview is hidden
+    await page.setViewportSize({ width: 1400, height: 900 })
+    expect(await frameWidth(page)).toBe(375)
+    await expect(page.getByRole('button', { name: 'Phone' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  test('a clamped preset is kept, and applies once there is room', async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 900 })
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    const tablet = page.getByRole('button', { name: 'Tablet' })
+    await tablet.click()
+    await expect(page.locator('.frame-readout')).toHaveText(/^\d+ \/ 768 px$/)
+
+    await page.setViewportSize({ width: 1101, height: 900 })
+    await expect(page.locator('.frame-readout')).toHaveText(/^\d+ \/ 768 px$/)
+    await expect(tablet).toHaveAttribute('aria-pressed', 'true')
+
+    await page.setViewportSize({ width: 1900, height: 900 })
+    await expect.poll(() => frameWidth(page)).toBe(768)
+    await expect(page.locator('.frame-readout')).toHaveText('768 px')
+  })
+
+  test('every toolbar control fits on one line at 1024px wide', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 })
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.getByRole('button', { name: 'Tablet' }).click() // the longest readout
+    const pane = await page.locator('.preview-pane').boundingBox()
+    for (const control of await page.locator('.device-toolbar :is(button, .frame-readout):visible').all()) {
+      const box = await control.boundingBox()
+      expect(box.x).toBeGreaterThanOrEqual(pane.x)
+      expect(box.x + box.width).toBeLessThanOrEqual(pane.x + pane.width + 0.5)
+      expect(box.height).toBeLessThan(32) // one line of text
+    }
+  })
+
+  test('opens the result in a new, sandboxed tab', async ({ page }) => {
+    const js = "try { parent.document.title } catch (e) { document.body.textContent = 'blocked:' + e.name }"
+    await openApp(page, shareLink({ html: '<p>x</p>', js }))
+    const [tab] = await Promise.all([
+      page.waitForEvent('popup'),
+      page.locator('#open-tab-button').click()
+    ])
+    await expect(tab).toHaveURL(/\/preview\.html#.+/)
+    await expect(tab).toHaveTitle('Cody Studio preview')
+    await expect(tab.frameLocator('#page').locator('body')).toHaveText('blocked:SecurityError')
+    expect(await tab.evaluate(() => window.opener)).toBeNull()
+  })
+
+  // A real pop-up blocker can't be switched on from a test, so this stands in
+  // for one by making window.open return null, as a blocked call does
+  test('says so when pop-ups are blocked', async ({ page }) => {
+    await page.addInitScript(() => { window.open = () => null })
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('#open-tab-button').click()
+    await expect(page.locator('#url-copy-container')).toHaveText('Allow pop-ups to open the preview')
+  })
+
+  test('a preset wider than the pane says it was clamped', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    const tablet = page.getByRole('button', { name: 'Tablet' })
+    await tablet.click()
+    // At the default split the preview pane is narrower than 768px
+    await expect(page.locator('.frame-readout')).toHaveText(/^\d+ \/ 768 px$/)
+    await expect(tablet).toHaveAttribute('aria-pressed', 'true')
+    await expect(tablet).toHaveAttribute('data-clamped', '')
+    await page.getByRole('button', { name: 'Phone' }).click()
+    await expect(page.locator('.frame-readout')).toHaveText('375 px')
+    await expect(tablet).not.toHaveAttribute('data-clamped')
+  })
+
+  test('a sized frame shows its edge, and Full leaves no clipped handle', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.getByRole('button', { name: 'Phone' }).click()
+    await expect(page.locator('.preview-frame')).toHaveAttribute('data-sized', '')
+    await page.getByRole('button', { name: 'Full', exact: true }).click()
+    await expect(page.locator('.preview-frame')).not.toHaveAttribute('data-sized')
+    const handle = await page.locator('.handle-frame').boundingBox()
+    const stage = await page.locator('.preview-stage').boundingBox()
+    expect(handle.x + handle.width).toBeLessThanOrEqual(stage.x + stage.width + 0.5)
+  })
+
+  test('the frame grip stays off the page until it is needed', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    const grip = () => page.locator('.handle-frame').evaluate(el => getComputedStyle(el, '::after').opacity)
+    expect(await grip()).toBe('0') // Full: the frame fills the stage
+    await page.locator('.handle-frame').hover()
+    await expect.poll(grip).toBe('1')
+  })
+
+  test('the pop-up message is readable on its background', async ({ page }) => {
+    await page.addInitScript(() => { window.open = () => null })
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('#open-tab-button').click()
+    const toast = page.locator('#url-copy-container')
+    await expect(toast).toBeVisible()
+    const [fg, bg] = await toast.evaluate(el => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor])
+    expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  test('fullscreen shows the preview pane full screen', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>x</p>' }))
+    await page.locator('#fullscreen-button').click()
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement?.classList.contains('preview-pane'))).toBe(true)
+    await expect(page.locator('#fullscreen-button')).toHaveText('Exit fullscreen')
+    await page.locator('#fullscreen-button').click()
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull()
+  })
+})
+
+test.describe('phone layout', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('opens empty editors on the JS editor', async ({ page }) => {
+    await openApp(page)
+    await expect(page.locator('#js-editor')).toBeVisible()
+    await expect(page.locator('.mobile-tabs [data-language="js"]')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('opens linked code on the preview, with the tab bar and no handles', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>hi</p>' }))
+    await expect(page.locator('#page')).toBeVisible()
+    await expect(page.locator('.editor-pane')).toBeHidden()
+    await expect(page.locator('.mobile-tabs')).toBeVisible()
+    await expect(page.locator('.handle-split')).toBeHidden()
+    await expect(page.locator('.mobile-tabs [data-panel="preview"]')).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('the tab bar switches between editors, preview and console', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>hi</p>', js: "console.log('phone')" }))
+    const tabs = page.locator('.mobile-tabs')
+
+    await tabs.locator('[data-language="html"]').click()
+    await expect(page.locator('#html-editor')).toBeVisible()
+    await expect(page.locator('#page')).toBeHidden()
+
+    await tabs.locator('[data-panel="console"]').click()
+    await expect(page.locator('#console')).toBeVisible()
+    await expect(consoleRows(page)).toHaveText(['phone'])
+    await expect(page.locator('.editor-pane')).toBeHidden()
+  })
+
+  test('menus stay on screen', async ({ page }) => {
+    await openApp(page)
+    for (const id of ['#examples-button', '#theme-button']) {
+      await page.locator(id).click()
+      const menu = page.locator(`${id} + .drop-down-menu-container`)
+      await expect(menu).toBeVisible()
+      const box = await menu.boundingBox()
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(390)
+      await page.keyboard.press('Escape')
+    }
+  })
+
+  test('long console lines wrap instead of scrolling sideways', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('a long line ' + 'x'.repeat(200))" }))
+    await page.locator('.mobile-tabs [data-panel="console"]').click()
+    await expect(consoleRows(page)).toHaveCount(1)
+    expect(await page.locator('#console .console-log').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+  })
+
+  test('a console row flows as one paragraph, not side-by-side columns', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('label', 'x'.repeat(300))" }))
+    await page.locator('.mobile-tabs [data-panel="console"]').click()
+    const parts = consoleRows(page).first().locator('span')
+    await expect(parts).toHaveCount(2)
+    // The long second part wraps back to the row's start, under the first part
+    const [labelRight, lastLineLeft] = await parts.evaluateAll(([label, long]) => {
+      const lines = long.getClientRects()
+      return [label.getBoundingClientRect().right, lines[lines.length - 1].left]
+    })
+    expect(lastLineLeft).toBeLessThan(labelRight)
+  })
+
+  test('choosing an example keeps the current panel', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>hi</p>' }))
+    await chooseExample(page, 'canvas')
+    await expect(page.frameLocator('#page').locator('canvas')).toHaveCount(1)
+    await expect(page.locator('#page')).toBeVisible()
+  })
+})
+
+test.describe('share links', () => {
+  test('keeps the code in the URL hash across reloads', async ({ page }) => {
+    await openBlank(page)
+    await focusEditorEnd(page, '#js-editor')
+    await page.keyboard.type("console.log('saved')")
+    await expect(page).toHaveURL(/\/#.+/)
+
+    await page.reload()
+    await expect(consoleRows(page)).toHaveText(['saved'])
+  })
+
+  test('loads another share link opened in the same tab', async ({ page }) => {
+    await openApp(page, shareLink({ js: "console.log('first')" }))
+    await expect(consoleRows(page)).toHaveText(['first'])
+
+    await page.goto(shareLink({ js: "console.log('second')" })) // only the hash changes
+    await expect(consoleRows(page)).toHaveText(['second'])
+  })
+
+  test('opens legacy path links, including base64 containing "/"', async ({ page }) => {
+    const html = '<p id="legacy">???</p>'
+    expect(encode(html)).toContain('/')
+    await openApp(page, `/${encode(html)}%7C${encode("console.log('legacy')")}%7C${encode('p { margin: 0 }')}`)
+
+    await expect(preview(page).locator('#legacy')).toHaveText('???')
+    await expect(consoleRows(page)).toHaveText(['legacy'])
+    // ...and moves them over to the hash format
+    await expect(page).toHaveURL(/^http:\/\/localhost:\d+\/#.+/)
+  })
+})
+
+// Share saves the code through the app's real API (scripts/test-server.js and
+// the local Docker database). These tests share the operating system's
+// clipboard, so they run one at a time.
+test.describe('share', () => {
+  test.describe.configure({ mode: 'serial' })
+  test.beforeEach(async ({ context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  })
+  // Each test starts from an empty clipboard, so a stale link can't pass for a new one
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await page.evaluate(() => navigator.clipboard.writeText(''))
+  })
+  const clipboard = (page) => page.evaluate(() => navigator.clipboard.readText())
+
+  test('copies a short /s/ link that opens the same code', async ({ page, context }) => {
+    const js = `console.log('shared ${Date.now()}')`
+    await openApp(page, shareLink({ js }))
+    await page.locator('#share-button').click()
+    await expect.poll(() => clipboard(page)).toMatch(/^http:\/\/localhost:4179\/s\/[0-9A-Za-z]{8}$/)
+    await expect(page.locator('#url-copy-container')).toHaveText('Link copied')
+    const link = await clipboard(page)
+
+    const other = await context.newPage()
+    await openApp(other, link.replace('http://localhost:4179', ''))
+    await expect(consoleRows(other)).toHaveText([js.slice(13, -2)])
+    await expect(other).toHaveURL(/\/#.+/)
+  })
+
+  test('the same code gives the same link', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>twice</p>' }))
+    await page.locator('#share-button').click()
+    await expect.poll(() => clipboard(page)).toMatch(/\/s\//)
+    const first = await clipboard(page)
+    await page.evaluate(() => navigator.clipboard.writeText(''))
+    await page.locator('#share-button').click()
+    await expect.poll(() => clipboard(page)).toBe(first)
+  })
+
+  test('copies the full link when saving fails', async ({ page }) => {
+    await page.route('**/api/snippets', route => route.abort())
+    await openApp(page, shareLink({ js: "console.log('offline share')" }))
+    await page.locator('#share-button').click()
+    await expect(page.locator('#url-copy-container')).toHaveText("Couldn't save, copied the full link instead")
+    expect(await clipboard(page)).toBe(page.url())
+  })
+
+  test('a long share message sits inside its padded toast on a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 })
+    await page.route('**/api/snippets', route => route.abort())
+    await openApp(page, shareLink({ js: "console.log('offline share')" }))
+    await page.locator('#share-button').click()
+    const toast = page.locator('#url-copy-container')
+    await expect(toast).toHaveText("Couldn't save, copied the full link instead")
+    await expect(toast.locator('.toast-icon-warn')).toBeVisible()
+    await expect(toast.locator('.toast-icon-ok')).toBeHidden()
+    const box = await toast.boundingBox()
+    const text = await toast.locator('.toast-text').boundingBox()
+    expect(box.x).toBeGreaterThanOrEqual(16)
+    expect(box.x + box.width).toBeLessThanOrEqual(360 - 16)
+    expect(text.x - box.x).toBeGreaterThanOrEqual(12)
+    expect(box.x + box.width - (text.x + text.width)).toBeGreaterThanOrEqual(12)
+    expect(text.y - box.y).toBeGreaterThanOrEqual(8)
+    expect(box.y + box.height - (text.y + text.height)).toBeGreaterThanOrEqual(8)
+    const tabs = await page.locator('.mobile-tabs').boundingBox()
+    expect(box.y + box.height).toBeLessThanOrEqual(tabs.y)
+  })
+
+  test('a copied link shows the success icon', async ({ page }) => {
+    await openApp(page, shareLink({ html: '<p>ok icon</p>' }))
+    await page.locator('#share-button').click()
+    const toast = page.locator('#url-copy-container')
+    await expect(toast).toHaveText('Link copied')
+    await expect(toast.locator('.toast-icon-ok')).toBeVisible()
+    await expect(toast.locator('.toast-icon-warn')).toBeHidden()
+  })
+
+  test('sharing empty editors copies the plain link', async ({ page }) => {
+    let saves = 0
+    page.on('request', request => { if (request.url().endsWith('/api/snippets')) saves++ })
+    await openBlank(page)
+    await page.locator('#share-button').click()
+    await expect.poll(() => clipboard(page)).toBe('http://localhost:4179/')
+    await expect(page.locator('#url-copy-container')).toHaveText('Link copied')
+    expect(saves).toBe(0)
+  })
+
+  test('a mistyped shared link says it does not exist, without asking the API', async ({ page }) => {
+    let calls = 0
+    page.on('request', request => { if (request.url().includes('/api/snippets')) calls++ })
+    await openApp(page, '/s/abcdefghi')
+    await expect(page.locator('#url-copy-container')).toHaveText("That shared link doesn't exist")
+    await expect(page).toHaveURL(/\/$/)
+    expect(calls).toBe(0)
+  })
+
+  test('an unknown shared link opens empty editors and says so', async ({ page }) => {
+    await openApp(page, '/s/zzzzzzzz')
+    await expect(page.locator('#url-copy-container')).toHaveText("That shared link doesn't exist")
+    await expect(page).toHaveURL(/\/$/)
+  })
+})
+
+test.describe('toolbar', () => {
+  test('menus open and close with mouse and keyboard', async ({ page }) => {
+    await openApp(page)
+    const button = page.locator('#font-size-button')
+    const menu = page.locator('#font-size-menu')
+
+    await button.click()
+    await expect(menu).toBeVisible()
+    await expect(button).toHaveAttribute('aria-expanded', 'true')
+
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await expect(button).toBeFocused()
+
+    // Clicking the icon inside the button opens it too
+    await page.locator('#font-size-button svg').click()
+    await expect(menu).toBeVisible()
+    await expect(button).toHaveClass(/buttons-active/)
+
+    // Clicking into the preview iframe closes it
+    await page.locator('#page').click()
+    await expect(menu).toBeHidden()
+
+    // Keyboard selection
+    await button.focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    await expect(page.locator('#js-editor .view-lines')).toHaveCSS('font-size', '14px')
+  })
+
+  test('theme and font size persist across reloads', async ({ page }) => {
+    await openApp(page)
+
+    await page.locator('#theme-button').click()
+    await page.locator('#theme-menu [data-value="vs"]').click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+
+    await page.locator('#font-size-button').click()
+    await page.locator('#font-size-menu [data-value="18"]').click()
+
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toHaveCount(4) // three panes and the console prompt
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+    await expect(page.locator('#js-editor .view-lines')).toHaveCSS('font-size', '18px')
+  })
+
+  test('the app page itself has no uncaught errors', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    // pageerror also reports errors thrown inside the preview iframe, so use
+    // code that doesn't throw
+    await openApp(page, shareLink({ html: '<p>hi</p>', js: "console.log('ok')" }))
+    await expect(consoleRows(page)).toHaveText(['ok'])
+    expect(errors).toEqual([])
+  })
+})

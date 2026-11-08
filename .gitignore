@@ -22,3 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Test output
+test-results
+playwright-report
+
+# Impeccable review captures and decision-page runtime state
+.impeccable/review/
+.impeccable/questions/
+
+# Superpowers plan-execution workspaces (ledgers, briefs)
+.superpowers/
+docs/superpowers/
+
+/.impeccable
+# Local secrets and the Vercel CLI link
+.env
+.vercel

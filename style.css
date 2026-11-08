@@ -20,6 +20,8 @@
   --accent-hover: #818cf8;
   --accent-contrast: #ffffff;
   --accent-soft: rgba(99, 102, 241, 0.16);
+  /* Deep Indigo: filled surfaces carrying white text (clears 4.5:1 in both themes) */
+  --accent-deep: color-mix(in srgb, var(--accent) 82%, #000);
 
   /* console */
   --console-bg: #0b0d13;
@@ -28,6 +30,8 @@
   --log-ok-bg: rgba(52, 211, 153, 0.12);
   --log-err: #f87171;
   --log-err-bg: rgba(248, 113, 113, 0.12);
+  --log-warn: #fbbf24;
+  --log-warn-bg: rgba(251, 191, 36, 0.12);
 
   /* misc */
   --radius: 10px;
@@ -64,6 +68,8 @@
   --log-ok-bg: rgba(4, 120, 87, 0.1);
   --log-err: #dc2626;
   --log-err-bg: rgba(220, 38, 38, 0.1);
+  --log-warn: #b45309;
+  --log-warn-bg: rgba(180, 83, 9, 0.1);
 }
 
 /* ============================================================
@@ -78,6 +84,7 @@
 body {
   display: flex;
   height: 100vh;
+  height: 100dvh; /* mobile browsers: exclude the retractable toolbar */
   overflow: hidden;
   font-size: 16px;
   font-family: var(--ui-font);
@@ -128,14 +135,15 @@ header {
   color: var(--text);
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: 19px;
-  letter-spacing: 0.5px;
+  font-size: 18px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
-.config-icon svg {
-  fill: var(--accent);
-  width: 22px;
-  height: 22px;
+.brand-logo {
+  flex: none;
+  width: 24px;
+  height: 24px;
 }
 
 .left-navbar-buttons {
@@ -199,6 +207,7 @@ header {
   width: 100%;
   display: flex;
   flex-direction: column;
+  gap: 2px;
   padding: 6px;
   font-size: 14px;
   border-radius: var(--radius-sm);
@@ -206,132 +215,625 @@ header {
   color: var(--text);
 }
 
-.drop-down-menu-container > ul {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.drop-down-menu-container[hidden] {
+  display: none;
 }
 
-.drop-down-menu-container > ul > li {
+.drop-down-menu-container > button {
   padding: 7px 10px;
+  border: none;
   border-radius: 5px;
+  background: none;
+  color: inherit;
+  font-size: inherit;
   cursor: pointer;
   text-align: left;
   transition: background 0.12s var(--ease), color 0.12s var(--ease);
 }
 
-.drop-down-menu-container > ul > li:hover {
+.drop-down-menu-container > button:hover {
   background: var(--accent-soft);
   color: var(--accent-hover);
   font-weight: 700;
 }
 
-/* ============================================================
-   Main + top navbar
-   ============================================================ */
-main {
-  width: 100%;
-  height: 100%;
+/* examples menu: the list on the left, a live preview of the hovered
+   example on the right */
+.examples-menu {
+  width: min(600px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: 220px 1fr;
+}
+
+.example-list {
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  gap: 2px;
 }
 
-.top-navbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  width: 100%;
-  height: 64px;
+.example-option {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 20px;
-  gap: 8px;
-}
-
-.top-navbar-buttons {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font-weight: 700;
-  font-size: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: background 0.15s var(--ease), color 0.15s var(--ease),
-    border-color 0.15s var(--ease), transform 0.05s var(--ease);
-  display: flex;
-  align-items: center;
-  padding: 10px 22px;
-  white-space: nowrap;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease);
+}
+
+.example-option:hover,
+.example-option:focus-visible,
+.example-option[aria-current='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.example-title {
+  font-weight: 700;
+}
+
+.example-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.example-option:hover .example-meta,
+.example-option:focus-visible .example-meta,
+.example-option[aria-current='true'] .example-meta {
+  color: inherit;
+}
+
+.example-detail {
+  display: grid;
+  align-content: start;
   gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-left: 1px solid var(--border);
 }
 
-.top-navbar-buttons:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
-  color: var(--text);
+/* The example renders at twice this size (about the real preview pane),
+   then scales down to fit */
+.example-detail-preview {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
 }
 
-.top-navbar-buttons:active {
-  transform: translateY(1px);
+.example-detail-preview iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  border: 0;
+  background: #fff;
+  transform: scale(0.5);
+  transform-origin: 0 0;
+  pointer-events: none;
 }
 
-.top-navbar-buttons.buttons-active {
+.example-detail-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.example-detail-text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Darker than the accent so white text clears 4.5:1 */
+.example-load {
+  justify-self: start;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent-deep);
   color: var(--accent-contrast);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.example-load:hover {
   background: var(--accent);
-  border-color: var(--accent);
+}
+
+@media (max-width: 700px) {
+  .examples-menu {
+    width: 264px;
+    grid-template-columns: 1fr;
+  }
+
+  .example-detail {
+    display: none;
+  }
 }
 
 /* ============================================================
-   Editors grid + panels
+   Workspace: tabbed editor, preview, console drawer
    ============================================================ */
-.front-end-view {
-  display: grid;
-  grid-template: 50% 50% / 40% 40% 20%;
-  grid-template-areas:
-    "html css console"
-    "js iframe console";
-  gap: 10px;
-  height: 90%;
-  width: 100%;
-  padding: 12px;
-  background: var(--bg);
-}
-
-.playground-view {
-  display: grid;
-  grid-template: 1fr 1fr / 70% 30%;
-  grid-template-areas:
-    "js console"
-    "js console";
-  gap: 10px;
+.workspace {
+  --split: 50%;
+  --console: 160px;
+  flex: 1;
+  min-width: 0;
   height: 100%;
-  max-width: 100%;
+  display: grid;
+  grid-template-columns: minmax(380px, var(--split)) 12px minmax(240px, 1fr);
+  grid-template-rows: minmax(0, 1fr) 12px var(--console);
+  grid-template-areas:
+    "editor split preview"
+    "drawer drawer drawer"
+    "console console console";
+  gap: 0;
   padding: 12px;
   background: var(--bg);
 }
 
-#html-editor { grid-area: html; }
-#js-editor { grid-area: js; }
-#css-editor { grid-area: css; }
-#page { grid-area: iframe; }
-.console { grid-area: console; }
-
-.editors {
+.pane {
   position: relative;
-  width: 100%;
-  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
   background: var(--surface);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-iframe.editors,
+.editor-pane {
+  grid-area: editor;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-pane {
+  grid-area: preview;
+  display: flex;
+  flex-direction: column;
+}
+
+.console {
+  grid-area: console;
+}
+
+.handle {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  touch-action: none;
+}
+
+.handle::after {
+  content: '';
+  border-radius: 2px;
+  background: var(--border-strong);
+  transition: background 0.15s var(--ease);
+}
+
+.handle:hover::after,
+.handle:focus-visible::after,
+.handle.is-dragging::after {
+  background: var(--accent);
+}
+
+.handle-split {
+  grid-area: split;
+  cursor: col-resize;
+}
+
+.handle-split::after {
+  width: 2px;
+  height: 40px;
+}
+
+.handle-console {
+  grid-area: drawer;
+  cursor: row-resize;
+}
+
+.handle-console::after {
+  width: 40px;
+  height: 2px;
+}
+
+/* While a handle is dragged, iframes must not swallow the pointer */
+.is-resizing iframe {
+  pointer-events: none;
+}
+
+.editor-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.editor-tabs {
+  display: flex;
+  align-self: flex-end;
+  gap: 2px;
+}
+
+.editor-tabs [role='tab'] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.editor-tabs [role='tab']:hover {
+  color: var(--text);
+}
+
+.editor-tabs [role='tab'][aria-selected='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.error-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--log-err);
+}
+
+.error-dot[hidden] {
+  display: none;
+}
+
+/* RUN CONTROLS: the auto-run switch and Run, beside the editor tabs */
+.run-controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.editor-bar .run-controls {
+  margin-left: auto;
+  padding-bottom: 6px;
+}
+
+.auto-run,
+.run-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.auto-run:hover {
+  color: var(--text);
+}
+
+.switch-track {
+  position: relative;
+  width: 24px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--border-strong);
+  transition: background 0.15s var(--ease);
+}
+
+.switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.auto-run[aria-checked='true'] .switch-track {
+  background: var(--accent);
+}
+
+.auto-run[aria-checked='true'] .switch-track::after {
+  transform: translateX(10px);
+  background: var(--accent-contrast);
+}
+
+.run-button {
+  padding-inline: 10px;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.run-button svg {
+  width: 10px;
+  height: 10px;
+  fill: currentColor;
+}
+
+.run-button:hover {
+  background: var(--surface-hover);
+}
+
+/* Auto-run is off and the preview hasn't run the latest edits */
+.run-button[data-stale] {
+  border-color: transparent;
+  background: var(--accent-soft);
+}
+
+.run-button[data-stale]::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* The focus ring is the Indigo Wash, which a stale Run is already filled with */
+.run-button:focus-visible {
+  border-color: var(--accent);
+}
+
+/* VIEW TOGGLE: the web view, or only JS beside the console */
+.view-toggle {
+  flex: none;
+  display: flex;
+  margin-left: auto;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.view-toggle button {
+  padding: 4px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.view-toggle button:hover {
+  color: var(--text);
+}
+
+.view-toggle button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.editor-bar .view-toggle + .run-controls {
+  margin-left: 0;
+}
+
+.workspace[data-view='js'] :is(.handle-console, [role='tab']:is([data-language='html'], [data-language='css'], [data-panel='preview'])) {
+  display: none;
+}
+
+/* The JS view keeps the preview running out of sight. Chrome deprioritizes a
+   display: none frame, which slows down heavy logging. */
+#workspace[data-view='js'] .preview-pane {
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 901px) {
+  .workspace[data-view='js'] {
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "editor split console";
+  }
+}
+
+/* The phone copy in the preview toolbar shows only in the phone layout */
+.device-toolbar .run-controls {
+  display: none;
+}
+
+/* A narrow editor keeps one row: tighter tabs, and the switch drops its word */
+.editor-pane {
+  container-type: inline-size;
+}
+
+@container (max-width: 440px) {
+  .editor-tabs [role='tab'] {
+    padding-inline: 8px;
+  }
+
+  .view-toggle button {
+    padding-inline: 6px;
+  }
+
+  .auto-run-label {
+    display: none;
+  }
+}
+
+/* Only the selected language's editor shows; the other two stay mounted */
+.editor {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: none;
+}
+
+.workspace[data-language='html'] #html-editor,
+.workspace[data-language='css'] #css-editor,
+.workspace[data-language='js'] #js-editor {
+  display: block;
+}
+
+.preview-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+}
+
+.preview-frame {
+  position: relative;
+  width: var(--frame-width, 100%);
+  max-width: 100%;
+  height: 100%;
+}
+
 #page {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
   background: #ffffff;
+}
+
+/* On a narrow pane the toolbar wraps to a second row; no control is clipped */
+.device-toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.device-presets,
+.frame-readout,
+.preview-action {
+  flex: none;
+  white-space: nowrap;
+}
+
+.device-presets {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.device-presets button,
+.preview-action {
+  padding: 4px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.device-presets button:hover,
+.preview-action:hover {
+  color: var(--text);
+}
+
+.device-presets button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* The preset is wider than the pane: still chosen, but visibly not met */
+.device-presets button[data-clamped] {
+  background: none;
+  box-shadow: inset 0 -2px 0 var(--text-muted);
+}
+
+.preview-action {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.frame-readout {
+  font-variant-numeric: tabular-nums;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* Free-drag handle on the frame's right edge; the frame stays centred */
+.handle-frame {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.handle-frame::after {
+  width: 2px;
+  height: 40px;
+}
+
+.preview-pane:fullscreen {
+  border-radius: 0;
+}
+
+/* A sized frame shows its edge, even when the page inside is white */
+.preview-frame[data-sized] {
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+/* A frame as wide as the stage would push its handle off the pane's
+   clipped edge; keep it inside, where it can be grabbed */
+.preview-frame[data-fills] .handle-frame {
+  right: 0;
+}
+
+/* Inside the frame the grip would sit on the user's page; show it only when needed */
+.preview-frame[data-fills] .handle-frame::after {
+  opacity: 0;
+}
+
+.preview-frame[data-fills] .handle-frame:is(:hover, :focus-visible, .is-dragging)::after {
+  opacity: 1;
 }
 
 /* faded language-logo watermark behind each editor */
@@ -348,26 +850,117 @@ iframe.editors,
 /* ============================================================
    Console
    ============================================================ */
+/* The console drawer: a header strip, the scrolling log, then (Task 4) the prompt */
 .console {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  align-items: stretch;
-  gap: 4px;
-  padding: 8px;
   background: var(--console-bg);
   color: var(--console-text);
   font-family: 'Cascadia Code', 'Consolas', monospace;
   font-size: 13px;
   letter-spacing: 0.3px;
-  overflow-x: auto;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.console-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font: 700 12px var(--ui-font);
+  letter-spacing: 0;
+}
+
+.console-title {
+  letter-spacing: 0.04em;
+}
+
+.console-filters {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.console-filter,
+.console-clear {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.console-filter:hover,
+.console-clear:hover {
+  color: var(--text);
+}
+
+.console-filter[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.console-count {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.console-clear {
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+}
+
+.console-clear svg {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.console-log {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  overflow: auto;
+}
+
+/* errors and logs are separate regions that still flow as one list */
+.console-region {
+  display: contents;
+}
+
+.console-empty,
+.console-dropped {
+  margin: 0;
+  padding: 4px 6px;
+  color: var(--text-muted);
+  font: 700 12px var(--ui-font);
+}
+
+.console-log[data-filter='log'] [data-level]:not([data-level='log']),
+.console-log[data-filter='warn'] [data-level]:not([data-level='warn']),
+.console-log[data-filter='error'] [data-level]:not([data-level='error']) {
+  display: none;
 }
 
 .error,
+.warn,
 .string-log {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-width: max-content;
   width: 100%;
@@ -382,51 +975,224 @@ iframe.editors,
   border-left-color: var(--log-err);
 }
 
+.warn {
+  color: var(--log-warn);
+  background: var(--log-warn-bg);
+  border-left-color: var(--log-warn);
+}
+
 .string-log {
   color: var(--log-ok);
   background: var(--log-ok-bg);
   border-left-color: var(--log-ok);
 }
 
-.error svg { fill: var(--log-err); }
-.string-log svg { fill: var(--log-ok); }
 .error svg,
+.warn svg,
 .string-log svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
 }
 
-.logsvg-span {
+/* Expandable values: a drawn disclosure triangle, then indented key: value lines */
+.value-tree {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.value-toggle {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.console .value-toggle svg {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: calc(0.6em - 4px);
+  fill: currentColor;
+  transition: transform 0.15s var(--ease);
+}
+
+.value-toggle[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+
+.value-children {
   display: flex;
+  flex-direction: column;
+  margin: 2px 0 2px 5px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+/* display: flex above would otherwise beat the hidden attribute */
+.value-children[hidden] {
+  display: none;
+}
+
+.value-line {
+  display: flex;
+  align-items: flex-start;
+  white-space: pre;
+}
+
+.value-key,
+.value-more {
+  color: var(--text-muted);
+}
+
+.value-text {
+  white-space: pre-wrap;
+}
+
+/* console.table */
+.console-table {
+  border-collapse: collapse;
+  font: inherit;
+  font-size: 12px;
+}
+
+.console-table th,
+.console-table td {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+  white-space: pre;
+}
+
+.console-table th {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.console-table thead th {
+  font-weight: 700;
+}
+
+/* Prompt entries (Task 4): the code you ran, then its value */
+.prompt-input,
+.prompt-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 10px 4px 13px;
+}
+
+.prompt-input {
+  color: var(--text-muted);
+  white-space: pre;
+}
+
+.prompt-input svg,
+.prompt-result svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  fill: var(--text-muted);
+}
+
+/* The prompt bar, docked under the log */
+.console-prompt {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 0 8px 0 12px;
+  border-top: 1px solid var(--border);
+}
+
+.console-prompt > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 8px;
+  fill: var(--accent);
+}
+
+.prompt-editor {
+  flex: 1;
+  min-width: 0;
+  height: 31px;
+}
+
+/* The prompt sits on the console's own background, not the editor theme's */
+.prompt-editor .monaco-editor {
+  --vscode-editor-background: var(--console-bg);
+  --vscode-editorGutter-background: var(--console-bg);
 }
 
 /* ============================================================
-   Toast (copy URL)
+   Toast
    ============================================================ */
 .url-copy-container {
   display: none;
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 240px;
-  height: 48px;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-weight: 700;
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px 10px 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  place-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
   z-index: 40;
-  animation: append-animate 0.18s var(--ease);
+  animation: toast-in 0.2s var(--ease);
+}
+
+.url-copy-container.visible {
+  display: flex;
+}
+
+.toast-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.toast-icon-ok {
+  color: var(--log-ok);
+}
+
+.toast-icon-warn {
+  color: var(--log-warn);
+}
+
+.url-copy-container[data-tone="ok"] .toast-icon-warn,
+.url-copy-container[data-tone="warn"] .toast-icon-ok {
+  display: none;
+}
+
+@keyframes toast-in {
+  from {
+    transform: translate(-50%, 8px);
+    opacity: 0;
+  }
 }
 
 /* ============================================================
    Utilities + animations
    ============================================================ */
-.hide-editor { display: none; }
-.show-editor { display: block; }
-
 @keyframes append-animate {
   from {
     transform: scale(0.96);
@@ -435,5 +1201,186 @@ iframe.editors,
   to {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+/* ============================================================
+   Phones: one panel at a time, picked from the tab bar
+   ============================================================ */
+.mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  body {
+    flex-direction: column;
+  }
+
+  header {
+    height: auto;
+  }
+
+  .left-navbar {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .config-icon {
+    width: auto;
+    height: 40px;
+    margin: 0 auto 0 0;
+    border-bottom: 0;
+  }
+
+  .btn-containers {
+    width: auto;
+    position: static;
+  }
+
+  /* Square icon buttons, every icon the same size */
+  .left-navbar-buttons {
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .left-navbar-buttons svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Icons only; the label stays as the accessible name */
+  .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Menus open full-width under the top bar, always on screen */
+  .drop-down-menu-container {
+    position: fixed;
+    top: 60px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+
+  /* Below the top bar, the workspace takes the rest of the screen */
+  .workspace {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "panel"
+      "tabs";
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .editor-pane,
+  .preview-pane,
+  .console {
+    grid-area: panel;
+  }
+
+  .workspace[data-panel='editor'] :is(.preview-pane, .console),
+  .workspace[data-panel='preview'] :is(.editor-pane, .console),
+  .workspace[data-panel='console'] :is(.editor-pane, .preview-pane),
+  .handle,
+  .editor-tabs,
+  .device-presets,
+  .frame-readout {
+    display: none;
+  }
+
+  .preview-frame {
+    width: 100%;
+  }
+
+  .device-toolbar .run-controls {
+    display: flex;
+    margin-right: auto;
+  }
+
+  /* Console lines flow as one wrapping paragraph instead of scrolling sideways */
+  .error,
+  .warn,
+  .string-log {
+    display: block;
+    min-width: 0;
+  }
+
+  .console .console-region span {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* A row's own parts only; the value tree inside keeps its own spacing */
+  .console .console-region > div > span + span {
+    margin-left: 8px;
+  }
+
+  .console .console-region > div > svg {
+    margin-right: 6px;
+    vertical-align: -4px;
+  }
+
+  /* The tab bar already says Console; Clear keeps its name as an icon */
+  .console-title,
+  .console-clear-label {
+    display: none;
+  }
+
+  .url-copy-container {
+    bottom: 76px; /* above the tab bar */
+  }
+
+  .mobile-tabs {
+    grid-area: tabs;
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  .mobile-tabs [role='tab'] {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 44px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .mobile-tabs [role='tab'][aria-selected='true'] {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+}
+
+/* Narrow phones keep the preview toolbar on one row: the switch drops its word,
+   as it does in a narrow editor bar */
+@media (max-width: 420px) {
+  .device-toolbar .auto-run-label {
+    display: none;
   }
 }

@@ -1,0 +1,100 @@
+/* Change --wave to 24 and the logo rides a bigger wave */
+:root {
+  --wave: 10;
+  --void: #000;
+  --frost: #7b7b7b;
+  --ivory: #e6e2d6;
+  --signal: #ffb000;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--void);
+  color: var(--ivory);
+  font-family: 'Pixelify Sans', monospace;
+}
+
+.dust {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.intro {
+  position: relative;
+  height: 100%;
+  display: grid;
+  align-content: center;
+  padding: 0 8%;
+}
+
+.logo {
+  margin: 0;
+  font-size: clamp(32px, min(24vmin, 17vw), 136px);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Each glyph rides the wave a beat behind the one before it */
+.logo span {
+  display: inline-block;
+  animation: ride 1.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.2s);
+}
+
+.letter {
+  padding: 0 0.04em;
+  cursor: pointer;
+}
+
+/* A flipped letter is a reversed cell: ivory ground, void glyph */
+.letter.flipped {
+  background: var(--ivory);
+  color: var(--void);
+}
+
+.signal {
+  width: 0.2em;
+  height: 0.2em;
+  margin-left: 0.06em;
+  background: var(--signal);
+}
+
+.tagline {
+  margin: 0.8em 0 0;
+  color: var(--frost);
+  font-size: clamp(13px, 3.4vmin, 18px);
+  letter-spacing: 0.24em;
+}
+
+.scroller {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12%;
+  height: 1.4em;
+  margin: 0;
+  font-size: clamp(18px, 6vmin, 30px);
+  white-space: nowrap;
+}
+
+.scroller span { position: absolute; left: 0; white-space: pre; }
+
+::selection { background: var(--signal); color: var(--void); }
+
+@keyframes ride {
+  50% { translate: 0 calc(var(--wave) * -1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo span { animation: none; }
+  .scroller { height: auto; padding: 0 8%; white-space: normal; }
+}

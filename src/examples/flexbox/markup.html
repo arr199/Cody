@@ -1,0 +1,30 @@
+<main class="page">
+  <header>
+    <h1>Five flexbox properties</h1>
+    <p>Every card is a flex item. Change <code>--card-min</code> in the CSS to rewrap them, and click a card to see how flexbox sized it.</p>
+  </header>
+  <ul class="cards">
+    <li><button class="card" aria-pressed="false" data-property="flex-wrap" data-value="wrap">
+      <span class="demo wrap"><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="name">flex-wrap</span><span class="note">Overflow starts a new line.</span>
+    </button></li>
+    <li><button class="card" aria-pressed="false" data-property="flex-grow" data-value="1">
+      <span class="demo grow"><i></i><i></i><i></i></span>
+      <span class="name">flex-grow</span><span class="note">One item takes the spare space.</span>
+    </button></li>
+    <li><button class="card" aria-pressed="false" data-property="gap" data-value="14px">
+      <span class="demo gap"><i></i><i></i><i></i></span>
+      <span class="name">gap</span><span class="note">Space between items only.</span>
+    </button></li>
+    <li><button class="card" aria-pressed="false" data-property="align-items" data-value="center">
+      <span class="demo align"><i></i><i></i><i></i></span>
+      <span class="name">align-items</span><span class="note">Lines items up across the row.</span>
+    </button></li>
+    <li><button class="card" aria-pressed="false" data-property="justify-content" data-value="space-between">
+      <span class="demo justify"><i></i><i></i><i></i></span>
+      <span class="name">justify-content</span><span class="note">Spreads items along the row.</span>
+    </button></li>
+  </ul>
+</main>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap">

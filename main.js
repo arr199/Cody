@@ -1,213 +1,196 @@
-/* eslint-disable no-new-func */
-/* eslint-disable brace-style */
-import { encode, decode } from 'js-base64'
-import { htmlEditor, cssEditor, jsEditor, createHtml } from './src/monaco/editors'
-// COMPONENTS
-import { FontSizeMenu } from './src/components/FontSizeMenu'
-import { ThemeMenu } from './src/components/ThemeMenu'
+import { monaco, createEditors, createPromptEditor, readCode, setFontSize } from './src/editors'
+import { encodeState, decodeState, hasCode } from './src/state/urlCodec'
+import { EXAMPLES, DEFAULT_EXAMPLE_ID, getExample } from './src/examples'
+import { buildDocument } from './src/preview/buildDocument'
+import { onConsoleMessage, createPromptChannel } from './src/preview/consoleBridge'
+import { preparePromptCode } from './src/preview/promptCode'
+import { createPreviewFrame } from './src/preview/previewFrame'
+import { createRunner } from './src/preview/runner'
+import { createConsolePanel } from './src/console/consolePanel'
+import { connectPrompt } from './src/console/consolePrompt'
+import { loadPreferences, applyTheme, saveFontSize } from './src/ui/preferences'
+import { createMenu, closeMenusOnOutsideInteraction } from './src/ui/menus'
+import { createWorkspace } from './src/ui/workspace'
+import { storedView, viewFor, connectViewToggle } from './src/ui/viewToggle'
+import { connectTabs, showTabErrors } from './src/ui/tabs'
+import { setupLayoutHandles } from './src/ui/layout'
+import { setupDeviceToolbar } from './src/preview/deviceToolbar'
+import { setupShare } from './src/ui/share'
+import { sharedSnippetId, isSharedPath, fetchSnippet } from './src/share/snippetClient'
+import { createToast } from './src/ui/toast'
+import { setupOpenInTab } from './src/preview/openInTab'
+import { renderExamplesMenu } from './src/ui/examplesMenu'
+import { connectRunControls } from './src/ui/runControls'
+import { debounce } from './src/utils/debounce'
 
-import { removeActiveClasses } from './src/utils/functions'
-import { API } from './src/utils/API'
-import { getErrors } from './src/monaco/getErrors'
-import { getConsoleLogs } from './src/monaco/getConsoleLogs'
+// Every preview render re-runs the user's JS, so JS edits wait longer
+// before re-rendering than HTML and CSS edits.
+const RENDER_DELAY = { html: 500, css: 500, js: 1500 }
+const ERRORS_DELAY = 1500
+// The share link follows the editors whether or not the preview runs
+const URL_DELAY = 500
 
-// FONT-SIZE ICON AND SELECT MENU
-const fontSizeButtonContainer = document.querySelector('#font-size-button-container')
-const fontSizeButton = document.querySelector('#font-size-button')
-// THEME
-const themeMenuButton = document.querySelector('#theme-button')
-const themeButtonContainer = document.querySelector('#theme-button-container')
-// COPY URL
-const copyUrlBtn = document.querySelector('#copy-url-button')
-const urlCopyContainer = document.querySelector('#url-copy-container')
+function bootstrap () {
+  const $ = (selector) => document.querySelector(selector)
+  const preview = createPreviewFrame($('#page'))
 
-const page = document.querySelector('#page')
-// TOP NAVBAR BUTTONS
-const frontEndButton = document.querySelector('#frontend-view-button')
-const playgroundButton = document.querySelector('#playground-view-button')
-
-function init () {
-  // APPLY THE SAVED THEME TO THE EDITORS + APP
-  applyTheme(localStorage.getItem('cody-editor-theme') || 'vs-dark')
-
-  // GETTING THE URL AND SPLITTING THE URL BASE64 PART BY "|" WHICH IS "%7C" IN URL ENCODE
-  const url = window.location.href.split('/')[3]
-  const rawHtml = url.split('%7C')[0]
-  const rawJs = url.split('%7C')[1]
-  const rawCss = url.split('%7C')[2]
-
-  // SETTING THE VALUES OF OUR EDITORS TO THE URL CODE , NOW DECODED
-  if (rawHtml) {
-    htmlEditor.setValue(decode(rawHtml))
-  }
-  if (rawJs) {
-    jsEditor.setValue(decode(rawJs))
-  }
-  if (rawCss) {
-    cssEditor.setValue(decode(rawCss))
-  }
-}
-
-// ADDING DEBOUNCING FOR OUR 3 EDITORS AND ALSO ENCODING THE TEXT IN BASE64 AND PASSING IT TO THE URL//
-let renderHtml
-htmlEditor.onDidChangeModelContent(e => {
-  clearTimeout(renderHtml)
-  renderHtml = setTimeout(() => { // WE ADD "|"  BETWEEN EVERY EDITOR CODE IN ORDER TO KNOW LATER//
-    page.setAttribute('srcdoc', createHtml()) // WHICH PART OF THE URL REPRESENT OUR EXACT EDITOR //
-    history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-  }, 500)
-})
-
-let renderJs
-jsEditor.onDidChangeModelContent(e => {
-  clearTimeout(renderJs)
-  renderJs = setTimeout(() => {
-    page.setAttribute('srcdoc', createHtml())
-    history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-    getConsoleLogs()
-  }, 1500)
-})
-
-let renderCss
-cssEditor.onDidChangeModelContent(e => {
-  clearTimeout(renderCss)
-  renderCss = setTimeout(function () {
-    page.setAttribute('srcdoc', createHtml())
-    history.replaceState(null, '', `${encode(htmlEditor.getValue())}|${encode(jsEditor.getValue())}|${encode(cssEditor.getValue())}`)
-  }, 500)
-})
-// GETTING THE EDITOR MARKERS (ERRORS) //
-getErrors()
-
-// THEME //
-// The Monaco theme is the single source of truth: a light editor theme
-// (vs / hc-light) puts the whole app in light mode, a dark one (vs-dark /
-// hc-black) puts it in dark mode. The choice is persisted across reloads
-// (see the inline script in index.html that applies it before paint).
-function isLightTheme (name) {
-  return name === 'vs' || name === 'hc-light'
-}
-
-function applyTheme (editorTheme) {
-  document.documentElement.setAttribute('data-theme', isLightTheme(editorTheme) ? 'light' : 'dark')
-  localStorage.setItem('cody-editor-theme', editorTheme)
-
-  htmlEditor.updateOptions({ theme: editorTheme })
-  cssEditor.updateOptions({ theme: editorTheme })
-  jsEditor.updateOptions({ theme: editorTheme })
-}
-
-/// //// EVENT LISTENERS //////
-
-// FRONTEND VIEW BUTTON //
-frontEndButton.addEventListener('click', () => {
-  const editorsEl = Array.from(document.querySelectorAll('.editors'))
-  const editorsContainer = document.querySelector('#editors-container')
-
-  editorsEl.forEach(editor => {
-    editor.style.display = 'block'
+  // WORKSPACE: which view, editor (and, on phones, which panel) is showing
+  const workspace = createWorkspace($('#workspace'), { view: storedView(), language: 'js', panel: 'editor' })
+  connectViewToggle($('.view-toggle'), workspace)
+  workspace.subscribe(({ view }) => { $('.preview-pane').inert = view === 'js' })
+  const editorTabs = $('.editor-tabs')
+  connectTabs(editorTabs, workspace, (tab, state) => tab.dataset.language === state.language)
+  const panelTabs = $('.mobile-tabs')
+  connectTabs(panelTabs, workspace, (tab, state) => tab.dataset.panel
+    ? state.panel === tab.dataset.panel
+    : state.panel === 'editor' && state.language === tab.dataset.language)
+  setupLayoutHandles($('#workspace'))
+  setupDeviceToolbar({
+    pane: $('.preview-pane'),
+    stage: $('.preview-stage'),
+    frame: $('.preview-frame'),
+    presets: $('.device-presets'),
+    readout: $('.frame-readout'),
+    frameHandle: $('.handle-frame'),
+    fullscreenButton: $('#fullscreen-button')
   })
-  editorsContainer.classList.remove('playground-view')
-  editorsContainer.classList.add('front-end-view')
-})
 
-// PLAYGROUND VIEW BUTTON //
-playgroundButton.addEventListener('click', () => {
-  const editorsEl = Array.from(document.querySelectorAll('.editors'))
-  const editorsContainer = document.querySelector('#editors-container')
+  const preferences = loadPreferences()
+  const editors = createEditors(
+    { html: $('#html-editor'), css: $('#css-editor'), js: $('#js-editor') },
+    preferences
+  )
+  applyTheme(preferences.theme)
 
-  editorsEl.forEach(editor => {
-    if (editor.id !== 'console' && editor.id !== 'js-editor') {
-      editor.style.display = 'none'
-    }
+  // CONSOLE
+  const consolePanel = createConsolePanel($('#console'))
+  const promptChannel = createPromptChannel(() => preview.window)
+  onConsoleMessage(() => preview.window, (message) => {
+    if (message.type === 'ready') promptChannel.open()
+    else consolePanel.receive(message)
   })
-  editorsContainer.classList.remove('front-end-view')
-  editorsContainer.classList.add('playground-view')
-})
+  // A marker's model tells which editor it belongs to. The console prompt is
+  // a Monaco editor too; its markers aren't editor errors. Neither are hints
+  // ("'x' is declared but never read"), which a JS pane with imports gets.
+  const paneOf = new Map(['html', 'css', 'js'].map(language => [editors[language].getModel().uri.toString(), language]))
+  const languageOf = (uri) => paneOf.get(uri.toString())
+  monaco.editor.onDidChangeMarkers(debounce(() => {
+    const markers = monaco.editor.getModelMarkers({})
+      .filter(marker => languageOf(marker.resource) && marker.severity > monaco.MarkerSeverity.Hint)
+    consolePanel.setErrors(markers)
+    const failing = markers.filter(marker => marker.severity === monaco.MarkerSeverity.Error)
+    const failingLanguages = new Set(failing.map(marker => languageOf(marker.resource)))
+    showTabErrors(editorTabs, failingLanguages)
+    showTabErrors(panelTabs, failingLanguages)
+  }, ERRORS_DELAY))
 
-// FONT SIZE BUTTON //
-fontSizeButton.addEventListener('click', (e) => {
-  e.target.classList.toggle('buttons-active')
-  const fontSizeMenu = document.querySelector('#font-size-menu')
+  // CONSOLE PROMPT: entries run in the preview, rewritten by preparePromptCode
+  const promptEditor = createPromptEditor(consolePanel.promptContainer, preferences)
+  connectPrompt(promptEditor, (code) => {
+    consolePanel.appendInput(code)
+    promptChannel.send(preparePromptCode(code))
+  })
 
-  if (fontSizeMenu !== null) {
-    fontSizeMenu.remove()
+  // PREVIEW + SHARE URL
+  // Always built from the app root, which also moves legacy path-based links
+  // over to the hash format.
+  function urlFor (code) {
+    const state = encodeState(code)
+    return import.meta.env.BASE_URL + (state ? `#${state}` : '')
   }
-  else {
-    fontSizeButtonContainer.insertAdjacentHTML('beforeend', FontSizeMenu())
+
+  function saveUrl () {
+    history.replaceState(null, '', urlFor(readCode(editors)))
   }
-  e.stopPropagation()
-})
+  const saveUrlSoon = debounce(saveUrl, URL_DELAY)
 
-// THEME BUTTON //
-themeMenuButton.addEventListener('click', (e) => {
-  e.target.classList.toggle('buttons-active')
-  const themeMenu = document.querySelector('#theme-menu')
-  if (themeMenu !== null) {
-    themeMenu.remove()
+  // RUN: auto-run, the Run button and Ctrl/Cmd+Enter decide when this happens
+  const runner = createRunner({
+    run () {
+      consolePanel.clearLogs()
+      promptChannel.reset()
+      preview.render(buildDocument(readCode(editors)))
+    },
+    delays: RENDER_DELAY
+  })
+  connectRunControls(document.querySelectorAll('.run-controls'), runner)
+
+  let loading = false
+
+  // Loaded code always runs, even with auto-run off. setValue fires change
+  // events synchronously; `loading` keeps them from counting as edits.
+  function loadCode (code) {
+    workspace.select({ view: viewFor(code, workspace.state.view), language: 'js', panel: workspace.state.panel })
+    loading = true
+    editors.html.setValue(code.html)
+    editors.css.setValue(code.css)
+    editors.js.setValue(code.js)
+    loading = false
+    saveUrl()
+    runner.runNow()
   }
-  else {
-    themeButtonContainer.insertAdjacentHTML('beforeend', ThemeMenu())
-  }
-  e.stopPropagation()
-})
 
-// COPY URL BUTTON //
-let disableTimer
-copyUrlBtn.addEventListener('click', () => {
-  clearTimeout(disableTimer)
-
-  urlCopyContainer.style.display = 'grid'
-  disableTimer = setTimeout(() => {
-    urlCopyContainer.style.display = 'none'
-
-    const urlContent = window.location.href
-    // SENDING OUR URL TO THE BACKEND AND GETTING THE SHORTENED VERSION OF IT //
-    fetch(API.LINK_SHORTENER_URL, {
-      method: 'POST',
-      body: JSON.stringify({ content: urlContent }),
-      headers: { 'Content-Type': 'application/json' }
+  for (const language of ['html', 'css', 'js']) {
+    editors[language].onDidChangeModelContent(() => {
+      if (loading) return
+      saveUrlSoon()
+      runner.edited(language)
     })
-      .then(res => res.json())
-      .then(data => {
-        navigator.clipboard.writeText(data.link)
+  }
+
+  const toast = createToast($('#url-copy-container'))
+
+  // Phones open linked code on its preview, and empty editors on the JS editor
+  function openCode (code) {
+    workspace.select({ panel: hasCode(code) ? 'preview' : 'editor' })
+    loadCode(code)
+  }
+
+  const snippetId = sharedSnippetId(window.location.pathname)
+  if (isSharedPath(window.location.pathname)) {
+    const lookup = snippetId ? fetchSnippet(snippetId) : Promise.resolve(null)
+    lookup
+      .then(code => {
+        if (code) return openCode(code)
+        toast.show("That shared link doesn't exist")
+        openCode(getExample(DEFAULT_EXAMPLE_ID))
+      }, error => {
+        console.error(error)
+        toast.show("Couldn't load the shared code")
+        openCode(getExample(DEFAULT_EXAMPLE_ID))
       })
-  }, 1000)
-})
-
-//  DROP DOWN MENU EVENT LISTENERS //
-document.addEventListener('click', (e) => {
-  const fontSizeMenu = document.querySelector('#font-size-menu')
-  const themeMenu = document.querySelector('#theme-menu')
-
-  if (e.target.dataset.id === 'font-size') {
-    htmlEditor.updateOptions({ fontSize: e.target.innerText })
-    cssEditor.updateOptions({ fontSize: e.target.innerText })
-    jsEditor.updateOptions({ fontSize: e.target.innerText })
-    fontSizeMenu.remove()
+  } else {
+    const linkedCode = decodeState(window.location)
+    openCode(hasCode(linkedCode) ? linkedCode : getExample(DEFAULT_EXAMPLE_ID))
   }
-  if (e.target.dataset.id === 'theme') {
-    applyTheme(e.target.dataset.theme)
-    themeMenu.remove()
+  // Opening another share link in the same tab only changes the hash, which
+  // doesn't reload the page. (replaceState in saveUrl() doesn't fire this.)
+  window.addEventListener('hashchange', () => loadCode(decodeState(window.location)))
+
+  // EXAMPLES
+  // Loading one adds a history entry, so Back brings the previous code back
+  // through the hashchange listener above.
+  function loadExample (id) {
+    const example = getExample(id)
+    history.pushState(null, '', urlFor(example))
+    loadCode(example)
   }
+  const examplesPicker = renderExamplesMenu($('#examples-menu'), EXAMPLES)
+  const examplesMenu = createMenu($('#examples-button'), $('#examples-menu'), loadExample, {
+    onToggle: examplesPicker.onToggle
+  })
 
-  removeActiveClasses()
-})
+  // TOOLBAR
+  const fontSizeMenu = createMenu($('#font-size-button'), $('#font-size-menu'), (value) => {
+    const fontSize = Number(value)
+    setFontSize(editors, fontSize)
+    saveFontSize(fontSize)
+  })
+  const themeMenu = createMenu($('#theme-button'), $('#theme-menu'), applyTheme)
+  closeMenusOnOutsideInteraction([examplesMenu, fontSizeMenu, themeMenu])
 
-// CLOSE THE DROP-DOWN MENU WHEN WE CLICK OUTSIDE OF IT //
-document.addEventListener('mousedown', (e) => {
-  const themeMenu = document.querySelector('#theme-menu')
-  const fontSizeMenu = document.querySelector('#font-size-menu')
+  setupShare($('#share-button'), toast, () => readCode(editors))
+  setupOpenInTab($('#open-tab-button'), () => readCode(editors), toast)
+}
 
-  const target = e.target
-  if (themeMenu !== null && themeMenu.contains(target) === false && target !== themeMenuButton) {
-    themeMenu.remove()
-    removeActiveClasses()
-  }
-  if (fontSizeMenu !== null && fontSizeMenu.contains(target) === false && target !== fontSizeButton) {
-    fontSizeMenu.remove()
-    removeActiveClasses()
-  }
-})
-
-init()
+bootstrap()
